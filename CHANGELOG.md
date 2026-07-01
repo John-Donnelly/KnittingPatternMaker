@@ -66,3 +66,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `apps/web` chart canvas and crop preview used fixed pixel widths that overflowed narrow
   (mobile) viewports; both now scale to their container (`max-width: 100%`, percentage-based
   crop overlay) instead of a hardcoded display width. Found via manual mobile-viewport testing.
+- `packages/core`'s share-link decoder (`decodePatternSpec`) processes untrusted input — anyone
+  can hand-craft a link — but had no upper bound on the encoded token length or on grid
+  dimensions after decoding, and decompressed into an unbounded buffer. A small, highly
+  repetitive payload could therefore expand to tens of megabytes (or more) during
+  decompression. Fixed by capping the encoded token length up front, decompressing into a
+  fixed-size buffer (so oversized input truncates and fails validation instead of growing
+  unbounded), and re-validating grid dimensions against the same `MAX_GRID_DIMENSION` bound the
+  rest of the app uses. Also closed a matching gap in `apps/api`'s export request schema, which
+  validated `grid.indices` length but not `grid.palette` length, so a crafted export request
+  could ask for an arbitrarily large color legend. `MAX_GRID_DIMENSION`/`MAX_COLORS` moved from
+  being duplicated in `apps/api` and `apps/web` into a single `packages/core/src/limits.ts`.
+
+### Docs
+
+- Added `docs/ARCHITECTURE.md` (monorepo layout, request flow, determinism strategy, shareable
+  links, PDF/PNG export, testing approach, known limitations) and `docs/KNITTING_NOTES.md` (the
+  exact knitting conventions the generators encode — chart reading order, floats, bobbins,
+  WS/RS stitch inversion, gauge math, yardage caveats, quantization approach), both already
+  referenced from the UI and PDF output. Rewrote `README.md` to describe the working app
+  instead of the original scaffold.

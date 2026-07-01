@@ -81,6 +81,19 @@ describe('POST /api/export/pdf', () => {
     const res = await request(app.server).post('/api/export/pdf').send(body);
     expect(res.status).toBe(400);
   });
+
+  it('rejects a palette larger than MAX_COLORS (prevents an oversized-legend resource exhaustion request)', async () => {
+    const body = samplePatternSpecBody();
+    const oversizedPalette = Array.from({ length: 41 }, (_, i) => ({
+      r: i % 256,
+      g: 0,
+      b: 0,
+    }));
+    const res = await request(app.server)
+      .post('/api/export/pdf')
+      .send({ ...body, grid: { ...body.grid, palette: oversizedPalette } });
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('POST /api/export/png', () => {

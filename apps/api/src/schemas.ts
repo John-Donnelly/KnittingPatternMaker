@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_COLORS, MAX_GRID_DIMENSION } from 'knitting-pattern-core';
 
 export const TechniqueSchema = z.enum(['stranded', 'intarsia', 'texture']);
 
@@ -22,11 +23,6 @@ export const RgbSchema = z.object({
   b: z.number().int().min(0).max(255),
 });
 
-/** Practical bounds for hand-knitting: large enough for real projects, small enough to render
- * and process in one request every time (the "works every time" determinism requirement). */
-export const MAX_GRID_DIMENSION = 400;
-export const MAX_COLORS = 40;
-
 export const PatternOptionsSchema = z.object({
   technique: TechniqueSchema,
   widthStitches: z.number().int().min(1).max(MAX_GRID_DIMENSION),
@@ -41,8 +37,8 @@ export type PatternOptions = z.infer<typeof PatternOptionsSchema>;
 export const GridBodySchema = z.object({
   width: z.number().int().min(1).max(MAX_GRID_DIMENSION),
   height: z.number().int().min(1).max(MAX_GRID_DIMENSION),
-  indices: z.array(z.number().int().min(0)),
-  palette: z.array(RgbSchema).min(1),
+  indices: z.array(z.number().int().min(0)).max(MAX_GRID_DIMENSION * MAX_GRID_DIMENSION),
+  palette: z.array(RgbSchema).min(1).max(MAX_COLORS),
 });
 
 export const PatternSpecBodySchema = z

@@ -1,5 +1,9 @@
-import type { DitherMode, Technique } from 'knitting-pattern-core';
-import { MAX_COLORS, MAX_GRID_DIMENSION } from '../constants.js';
+import {
+  MAX_COLORS,
+  MAX_GRID_DIMENSION,
+  type DitherMode,
+  type Technique,
+} from 'knitting-pattern-core';
 
 export interface FormState {
   technique: Technique;

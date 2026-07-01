@@ -6,6 +6,7 @@ import {
   type PatternSpec,
 } from '../src/pattern/shareState.js';
 import { encodeBase64Url } from '../src/pattern/base64url.js';
+import { MAX_GRID_DIMENSION, MAX_SHARE_LINK_LENGTH } from '../src/limits.js';
 import type { Grid } from '../src/types.js';
 
 function sampleSpec(): PatternSpec {
@@ -83,5 +84,50 @@ describe('encodePatternSpec / decodePatternSpec', () => {
     const compressed = zlibSync(new TextEncoder().encode(JSON.stringify(payload)));
     const encoded = encodeBase64Url(compressed);
     expect(() => decodePatternSpec(encoded)).toThrow(/out of palette range/i);
+  });
+
+  it('rejects an oversized encoded token before attempting to decode it', () => {
+    const huge = 'A'.repeat(MAX_SHARE_LINK_LENGTH + 1);
+    expect(() => decodePatternSpec(huge)).toThrow(/too long/i);
+  });
+
+  it('rejects grid dimensions beyond MAX_GRID_DIMENSION even if internally consistent', () => {
+    const size = MAX_GRID_DIMENSION + 1;
+    const payload = {
+      v: 1,
+      t: 'stranded',
+      w: size,
+      h: 1,
+      p: [[0, 0, 0]],
+      i: new Array(size).fill(0),
+    };
+    const compressed = zlibSync(new TextEncoder().encode(JSON.stringify(payload)));
+    const encoded = encodeBase64Url(compressed);
+    expect(() => decodePatternSpec(encoded)).toThrow(/invalid grid dimensions/i);
+  });
+
+  it('does not allocate unbounded memory for a decompression-bomb-style payload', () => {
+    // A large, highly repetitive buffer compresses to a tiny token but would expand to tens of
+    // megabytes if decompressed without a cap. Decoding it must fail cleanly, not hang or throw
+    // an out-of-memory error.
+    const bomb = new Uint8Array(50 * 1024 * 1024);
+    const compressed = zlibSync(bomb, { level: 9 });
+    const encoded = encodeBase64Url(compressed);
+    expect(encoded.length).toBeLessThan(MAX_SHARE_LINK_LENGTH);
+    expect(() => decodePatternSpec(encoded)).toThrow();
+  });
+
+  it('round-trips a pattern at the maximum grid dimension', () => {
+    const size = MAX_GRID_DIMENSION;
+    const grid: Grid = {
+      width: size,
+      height: 1,
+      indices: Uint16Array.from(new Array(size).fill(0)),
+      palette: [{ r: 1, g: 2, b: 3 }],
+    };
+    const encoded = encodePatternSpec({ technique: 'texture', grid });
+    expect(encoded.length).toBeLessThan(MAX_SHARE_LINK_LENGTH);
+    const decoded = decodePatternSpec(encoded);
+    expect(decoded.grid.width).toBe(size);
   });
 });

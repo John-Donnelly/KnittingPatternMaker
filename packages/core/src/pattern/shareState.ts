@@ -1,6 +1,7 @@
 import { unzlibSync, zlibSync } from 'fflate';
 import type { GaugeSpec, Grid, RGB, Technique } from '../types.js';
 import { decodeBase64Url, encodeBase64Url } from './base64url.js';
+import { MAX_GRID_DIMENSION, MAX_SHARE_LINK_LENGTH } from '../limits.js';
 
 export interface PatternSpec {
   technique: Technique;
@@ -9,6 +10,15 @@ export interface PatternSpec {
 }
 
 const KNOWN_TECHNIQUES: readonly Technique[] = ['stranded', 'intarsia', 'texture'];
+
+/**
+ * Hard cap on decompressed bytes, enforced by decompressing into a fixed-size buffer. A
+ * MAX_GRID_DIMENSION x MAX_GRID_DIMENSION, MAX_COLORS pattern's JSON is well under 1MB even
+ * uncompressed, so this has generous headroom for legitimate patterns while bounding a
+ * maliciously crafted link (deflate can expand highly repetitive input by orders of magnitude)
+ * to a small, fixed amount of memory instead of however large the attacker wants.
+ */
+const MAX_DECOMPRESSED_BYTES = 2 * 1024 * 1024;
 
 interface SerializedSpecV1 {
   v: 1;
@@ -41,8 +51,16 @@ export function encodePatternSpec(spec: PatternSpec): string {
   return encodeBase64Url(compressed);
 }
 
-/** Inverse of {@link encodePatternSpec}. Throws a descriptive error on any corrupt/tampered input. */
+/**
+ * Inverse of {@link encodePatternSpec}. Throws a descriptive error on any corrupt/tampered
+ * input. `encoded` is untrusted (anyone can craft a link), so this rejects oversized input
+ * before decompressing it and re-validates grid dimensions after — see MAX_SHARE_LINK_LENGTH.
+ */
 export function decodePatternSpec(encoded: string): PatternSpec {
+  if (encoded.length > MAX_SHARE_LINK_LENGTH) {
+    throw new Error(`Pattern link is too long (max ${MAX_SHARE_LINK_LENGTH} characters)`);
+  }
+
   let bytes: Uint8Array;
   try {
     bytes = decodeBase64Url(encoded);
@@ -52,7 +70,8 @@ export function decodePatternSpec(encoded: string): PatternSpec {
 
   let json: string;
   try {
-    json = new TextDecoder().decode(unzlibSync(bytes));
+    const out = new Uint8Array(MAX_DECOMPRESSED_BYTES);
+    json = new TextDecoder().decode(unzlibSync(bytes, { out }));
   } catch {
     throw new Error('Invalid or corrupted pattern link');
   }
@@ -70,7 +89,14 @@ export function decodePatternSpec(encoded: string): PatternSpec {
   if (!KNOWN_TECHNIQUES.includes(parsed.t)) {
     throw new Error(`Unknown technique in pattern link: ${String(parsed.t)}`);
   }
-  if (!Number.isInteger(parsed.w) || !Number.isInteger(parsed.h) || parsed.w < 1 || parsed.h < 1) {
+  if (
+    !Number.isInteger(parsed.w) ||
+    !Number.isInteger(parsed.h) ||
+    parsed.w < 1 ||
+    parsed.h < 1 ||
+    parsed.w > MAX_GRID_DIMENSION ||
+    parsed.h > MAX_GRID_DIMENSION
+  ) {
     throw new Error('Invalid grid dimensions in pattern link');
   }
   if (!Array.isArray(parsed.i) || parsed.i.length !== parsed.w * parsed.h) {
