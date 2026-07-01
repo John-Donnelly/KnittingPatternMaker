@@ -13,3 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `apps/api` (Fastify backend), and `apps/web` (React frontend).
 - Shared TypeScript, ESLint (flat config), and Prettier configuration.
 - Placeholder health-check endpoint and scaffold UI to prove the workspace wiring end to end.
+- `packages/core` deterministic image pipeline: sRGB→CIE Lab conversion, perceptual nearest-color
+  matching, median-cut color quantization, box-filter pixelation/downsampling, ordered (Bayer 4x4)
+  and Floyd-Steinberg dithering, and gauge math (stitch aspect-ratio correction, finished-size
+  estimate, aspect-aware suggested crop rect). 49 unit tests, including explicit
+  same-input-same-output determinism checks for every stage.
