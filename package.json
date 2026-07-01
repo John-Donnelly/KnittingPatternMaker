@@ -1,0 +1,32 @@
+{
+  "name": "knitting-pattern-maker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Convert any image into deterministic pixel art and a complete, printable knitting pattern.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "npm run build -w packages/core && npm run build -w apps/api && npm run build -w apps/web",
+    "test": "npm run build -w packages/core && npm run test -w packages/core && npm run test -w apps/api && npm run test -w apps/web",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run typecheck -w packages/core && npm run build -w packages/core && npm run typecheck -w apps/api && npm run typecheck -w apps/web",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:api": "npm run dev --workspace=apps/api"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.6.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.4",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.62.1"
+  }
+}
