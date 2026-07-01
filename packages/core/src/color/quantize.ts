@@ -100,9 +100,32 @@ export function medianCutPalette(samples: readonly RGB[], maxColors: number): RG
     const sorted = box.points
       .slice()
       .sort((a, b) => a[channel] - b[channel] || a.r - b.r || a.g - b.g || a.b - b.b);
-    const mid = Math.ceil(sorted.length / 2);
 
-    boxes.splice(splitIndex, 1, { points: sorted.slice(0, mid) }, { points: sorted.slice(mid) });
+    // Split at the largest gap between consecutive VALUES, not the middle index. Splitting by
+    // index alone balances sample *count*, which can slice a genuinely separated cluster in
+    // half while merging two unrelated clusters together (e.g. a flat red/blue flag with a
+    // thin red-white blend row at the stripe edge: index-median would lump part of red with
+    // blue into a muddy purple that appears nowhere in the source). Splitting at the widest
+    // value gap keeps naturally separated colors apart instead.
+    let splitAt = Math.ceil(sorted.length / 2);
+    let widestGap = -1;
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1];
+      const cur = sorted[i];
+      if (!prev || !cur) continue;
+      const gap = cur[channel] - prev[channel];
+      if (gap > widestGap) {
+        widestGap = gap;
+        splitAt = i;
+      }
+    }
+
+    boxes.splice(
+      splitIndex,
+      1,
+      { points: sorted.slice(0, splitAt) },
+      { points: sorted.slice(splitAt) },
+    );
   }
 
   return boxes
