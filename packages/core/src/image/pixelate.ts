@@ -1,12 +1,5 @@
 import type { CropRect, PixelBuffer, RGB } from '../types.js';
-
-function clampCrop(crop: CropRect, sourceWidth: number, sourceHeight: number): CropRect {
-  const x = Math.max(0, Math.min(crop.x, sourceWidth - 1));
-  const y = Math.max(0, Math.min(crop.y, sourceHeight - 1));
-  const width = Math.max(1, Math.min(crop.width, sourceWidth - x));
-  const height = Math.max(1, Math.min(crop.height, sourceHeight - y));
-  return { x, y, width, height };
-}
+import { axisBounds, clampCrop } from './cellBounds.js';
 
 /**
  * Deterministic box-filter downsample (or nearest-neighbor upsample) of a crop region of
@@ -31,16 +24,10 @@ export function pixelate(
   const cells: RGB[] = new Array(gridWidth * gridHeight);
 
   for (let cy = 0; cy < gridHeight; cy++) {
-    const srcY0 = crop.y + Math.floor((cy * crop.height) / gridHeight);
-    let srcY1 = crop.y + Math.floor(((cy + 1) * crop.height) / gridHeight);
-    srcY1 = Math.max(srcY1, srcY0 + 1);
-    srcY1 = Math.min(srcY1, crop.y + crop.height);
+    const [srcY0, srcY1] = axisBounds(crop.y, crop.height, gridHeight, cy);
 
     for (let cx = 0; cx < gridWidth; cx++) {
-      const srcX0 = crop.x + Math.floor((cx * crop.width) / gridWidth);
-      let srcX1 = crop.x + Math.floor(((cx + 1) * crop.width) / gridWidth);
-      srcX1 = Math.max(srcX1, srcX0 + 1);
-      srcX1 = Math.min(srcX1, crop.x + crop.width);
+      const [srcX0, srcX1] = axisBounds(crop.x, crop.width, gridWidth, cx);
 
       let rSum = 0;
       let gSum = 0;

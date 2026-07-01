@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Dominant-color sampling** — a selectable `sampling` mode (`average` default, or `dominant`)
+  that extracts crisp pixel art from a source that isn't clean flat-color art (a photo,
+  screenshot, or JPEG of a chart/logo). Where the default box-filter averages every source pixel
+  in a cell — blending thin grid lines, anti-aliased edges, and JPEG ringing into muddy
+  intermediate colors — dominant sampling groups the cell's pixels into 16-value buckets, takes
+  the modal bucket, and returns the true mean of just that bucket, so outlier pixels are rejected
+  and each cell reads as the flat color that actually fills it
+  (`packages/core/src/image/dominantSample.ts`, dispatched via `sampleImage`). Wired through
+  `/api/pattern` (`sampling` option) and the UI (a Sampling dropdown with mode-specific guidance).
+  Extracted the shared, deterministic cell-boundary math into `cellBounds.ts` so both samplers
+  partition the crop identically (existing `pixelate` tests confirm the refactor is behavior-
+  preserving). Verified on the user's real 508×664 JPEG forest chart: dominant sampling kept the
+  sky **pure white** (averaging muddied it to gray `#c9cac9`) and cut the intarsia bobbin count
+  from 930 to 444. 12 new core tests + 2 API integration tests (exact flat-color recovery,
+  outlier rejection, tie-breaking, determinism) + 1 web control test.
+
 - Monorepo scaffold: npm workspaces with `packages/core` (shared deterministic algorithms),
   `apps/api` (Fastify backend), and `apps/web` (React frontend).
 - Shared TypeScript, ESLint (flat config), and Prettier configuration.

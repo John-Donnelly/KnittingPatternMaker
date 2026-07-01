@@ -5,6 +5,7 @@ import type {
   GaugeSpec,
   GridJson,
   PatternResultJson,
+  SamplingMode,
   Technique,
   YardageEstimate,
 } from 'knitting-pattern-core';
@@ -16,6 +17,7 @@ export interface PatternOptions {
   gauge?: GaugeSpec;
   maxColors: number;
   dither: DitherMode;
+  sampling: SamplingMode;
   crop?: CropRect;
   seamless: boolean;
 }

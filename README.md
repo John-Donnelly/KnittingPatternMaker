@@ -38,9 +38,11 @@ npm run dev:web          # starts the frontend on http://localhost:5173 (proxies
 ```
 
 Open the frontend URL, drop in an image, and adjust the technique/dimensions/gauge/colors —
-the preview updates automatically. Download a PDF/PNG or copy a shareable link once you're happy
-with it. A shared link is fully self-contained: opening one renders the exact same pattern
-without needing the original image or a live backend.
+the preview updates automatically. Working from a photo or JPEG of an existing chart? Switch
+**Sampling** to _Dominant color_ to pull crisp flat colors out instead of muddy averaged ones
+(see [docs/KNITTING_NOTES.md](docs/KNITTING_NOTES.md)). Download a PDF/PNG or copy a shareable
+link once you're happy with it. A shared link is fully self-contained: opening one renders the
+exact same pattern without needing the original image or a live backend.
 
 ## Scripts (root)
 

@@ -13,6 +13,7 @@ function baseForm(overrides: Partial<FormState> = {}): FormState {
     rowsPer4In: 30,
     maxColors: 8,
     dither: 'none',
+    sampling: 'average',
     cropMode: 'auto',
     seamless: false,
     ...overrides,
@@ -66,5 +67,15 @@ describe('ControlsPanel', () => {
     await user.click(screen.getByLabelText(/Seamless tiling/));
 
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ seamless: true }));
+  });
+
+  it('changes the sampling mode via the select', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<ControlsPanel value={baseForm({ sampling: 'average' })} onChange={onChange} />);
+
+    await user.selectOptions(screen.getByLabelText('Sampling'), 'dominant');
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ sampling: 'dominant' }));
   });
 });

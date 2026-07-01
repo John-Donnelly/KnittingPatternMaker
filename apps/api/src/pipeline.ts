@@ -5,7 +5,7 @@ import {
   encodePatternSpec,
   finishedSize,
   makeSeamless,
-  pixelate,
+  sampleImage,
   quantizeGrid,
   quantizeTexture,
   serializeGrid,
@@ -79,7 +79,13 @@ export async function runPipeline(
       options.gauge,
     );
 
-  const pixelated = pixelate(source, crop, options.widthStitches, options.heightRows);
+  const pixelated = sampleImage(
+    source,
+    crop,
+    options.widthStitches,
+    options.heightRows,
+    options.sampling,
+  );
   const samples = options.seamless
     ? makeSeamless(pixelated, options.widthStitches, options.heightRows, {
         horizontal: true,

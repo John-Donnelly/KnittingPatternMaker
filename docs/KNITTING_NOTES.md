@@ -78,6 +78,33 @@ exact expected output.
   consumed by any floats for that color. It is explicitly not a precise physical model — actual
   usage depends on fiber, tension, and finishing. Always buy a margin over the estimate.
 
+## Sampling (turning source pixels into stitch cells)
+
+Before quantization, every source pixel that falls inside a stitch cell has to become one color.
+There are two modes (`packages/core/src/image/`):
+
+- **Average** (`pixelate.ts`, default): the box-filter mean of every covered pixel. Correct for
+  photos and smooth gradients, where blending neighboring pixels is exactly what you want.
+- **Dominant** (`dominantSample.ts`): the cell's **modal** color — group the covered pixels into
+  16-value-per-channel buckets, pick the bucket with the most pixels, and return the true mean of
+  just that bucket. This **rejects outlier pixels**: a thin grid line, an anti-aliased edge, or
+  JPEG ringing is a minority of the cell and gets ignored, so each cell reads as the flat color
+  that actually fills it.
+
+Use **dominant** to pull crisp pixel art out of a source that isn't clean flat-color art — a
+photo, screenshot, or JPEG of a chart/logo/pixel-art image. On a JPEG of an existing chart, the
+grid lines and compression halos otherwise get averaged in: a white sky comes out muddy gray,
+flat greens turn olive, and the extra intermediate colors fracture intarsia into far more color
+blocks (more bobbins). Dominant sampling recovers the flat colors instead — verified on a real
+508×664 JPEG chart, where it kept the sky pure white and roughly halved the intarsia bobbin count
+versus averaging.
+
+Caveats: dominant sampling is deliberately _not_ for photos (it posterizes smooth gradients into
+blocky steps), and a genuinely distinct color that straddles a 16-value bucket boundary can have
+its vote split — but the subsequent palette quantization absorbs that rare case. When downsampling
+heavily, a few isolated stitches of a dark/saturated source color can still win their cell and read
+as speckle; lowering the max-color count cleans those up.
+
 ## Color quantization
 
 - Colors are reduced via **median-cut**, splitting each box at the **largest gap between

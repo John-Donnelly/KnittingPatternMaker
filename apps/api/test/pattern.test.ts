@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { FastifyInstance } from 'fastify';
 import { buildServer } from '../src/server.js';
-import { makeRampImagePng, makeTestImagePng } from './helpers.js';
+import { makeGriddedChartPng, makeRampImagePng, makeTestImagePng } from './helpers.js';
 
 describe('POST /api/pattern', () => {
   let app: FastifyInstance;
@@ -119,6 +119,69 @@ describe('POST /api/pattern', () => {
     // Seamless blending alters the pixel data before quantization, so the resulting grid
     // should differ from the non-seamless run on this hard-wrap-edge test image.
     expect(withSeamless.body.grid).not.toEqual(withoutSeamless.body.grid);
+  });
+
+  it('dominant sampling recovers flat chart colors that averaging muddies with gridlines', async () => {
+    // A 20x20-cell gridded chart at 12px/cell: flat green + white cells behind a gray grid.
+    const image = await makeGriddedChartPng(20, 20, 12);
+    const baseOptions = {
+      technique: 'intarsia',
+      widthStitches: 20,
+      heightRows: 20,
+      maxColors: 8,
+      dither: 'none',
+      crop: { x: 0, y: 0, width: 240, height: 240 },
+    };
+
+    const avg = await request(app.server)
+      .post('/api/pattern')
+      .field('options', JSON.stringify({ ...baseOptions, sampling: 'average' }))
+      .attach('image', image, 'chart.png');
+    const dom = await request(app.server)
+      .post('/api/pattern')
+      .field('options', JSON.stringify({ ...baseOptions, sampling: 'dominant' }))
+      .attach('image', image, 'chart.png');
+
+    expect(avg.status).toBe(200);
+    expect(dom.status).toBe(200);
+    expect(dom.body.seamless).toBe(false);
+
+    type C = { r: number; g: number; b: number };
+    const has = (palette: C[], t: C) =>
+      palette.some((c) => c.r === t.r && c.g === t.g && c.b === t.b);
+
+    // Dominant sampling rejects the 1px gray grid in each cell and recovers the EXACT flat
+    // source colors (green #1e7828 and white #f5f5f5).
+    expect(has(dom.body.grid.palette, { r: 30, g: 120, b: 40 })).toBe(true);
+    expect(has(dom.body.grid.palette, { r: 245, g: 245, b: 245 })).toBe(true);
+
+    // Averaging blends the grid in, so neither exact color survives — every palette entry is
+    // shifted toward gray.
+    expect(has(avg.body.grid.palette, { r: 30, g: 120, b: 40 })).toBe(false);
+    expect(has(avg.body.grid.palette, { r: 245, g: 245, b: 245 })).toBe(false);
+  });
+
+  it('produces identical results for repeated dominant-sampling calls (determinism)', async () => {
+    const image = await makeGriddedChartPng(16, 16, 10);
+    const options = {
+      technique: 'intarsia',
+      widthStitches: 16,
+      heightRows: 16,
+      maxColors: 6,
+      dither: 'none',
+      sampling: 'dominant',
+      crop: { x: 0, y: 0, width: 160, height: 160 },
+    };
+    const first = await request(app.server)
+      .post('/api/pattern')
+      .field('options', JSON.stringify(options))
+      .attach('image', image, 'chart.png');
+    const second = await request(app.server)
+      .post('/api/pattern')
+      .field('options', JSON.stringify(options))
+      .attach('image', image, 'chart.png');
+    expect(first.body.grid).toEqual(second.body.grid);
+    expect(first.body.shareLink).toBe(second.body.shareLink);
   });
 
   it('produces identical results for repeated seamless calls with the same input (determinism)', async () => {

@@ -2,6 +2,7 @@ import {
   MAX_COLORS,
   MAX_GRID_DIMENSION,
   type DitherMode,
+  type SamplingMode,
   type Technique,
 } from 'knitting-pattern-core';
 
@@ -14,6 +15,7 @@ export interface FormState {
   rowsPer4In: number;
   maxColors: number;
   dither: DitherMode;
+  sampling: SamplingMode;
   cropMode: 'auto' | 'full';
   seamless: boolean;
 }
@@ -136,6 +138,25 @@ export function ControlsPanel({ value, onChange }: Props) {
           />
         </label>
       )}
+
+      <label className="field">
+        <span>Sampling</span>
+        <select
+          value={value.sampling}
+          aria-describedby="sampling-hint"
+          onChange={(e) => set('sampling', e.target.value as SamplingMode)}
+        >
+          <option value="average">Average (smooth — best for photos)</option>
+          <option value="dominant">
+            Dominant color (crisp — best for charts / logos / pixel art)
+          </option>
+        </select>
+      </label>
+      <span id="sampling-hint" className="field__hint">
+        {value.sampling === 'dominant'
+          ? 'Picks each cell’s most common color and ignores grid lines / JPEG noise — recovers flat colors from a photo or JPEG of a chart.'
+          : 'Averages each cell — natural for photos and gradients, but can muddy a scanned chart’s flat colors.'}
+      </span>
 
       <label className="field">
         <span>Dithering</span>

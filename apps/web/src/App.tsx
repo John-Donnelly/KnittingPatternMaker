@@ -38,6 +38,7 @@ const DEFAULT_FORM: FormState = {
   rowsPer4In: 30,
   maxColors: 8,
   dither: 'none',
+  sampling: 'average',
   cropMode: 'auto',
   seamless: false,
 };
@@ -122,6 +123,7 @@ export function App() {
       heightRows: debouncedForm.heightRows,
       maxColors: debouncedForm.maxColors,
       dither: debouncedForm.dither,
+      sampling: debouncedForm.sampling,
       crop,
       seamless: debouncedForm.seamless,
       ...(gauge ? { gauge } : {}),

@@ -5,6 +5,8 @@ export const TechniqueSchema = z.enum(['stranded', 'intarsia', 'texture']);
 
 export const DitherModeSchema = z.enum(['none', 'bayer4', 'floyd-steinberg']);
 
+export const SamplingModeSchema = z.enum(['average', 'dominant']);
+
 export const GaugeSpecSchema = z.object({
   stitchesPer4In: z.number().positive().max(200),
   rowsPer4In: z.number().positive().max(200),
@@ -30,6 +32,9 @@ export const PatternOptionsSchema = z.object({
   gauge: GaugeSpecSchema.optional(),
   maxColors: z.number().int().min(1).max(MAX_COLORS).default(8),
   dither: DitherModeSchema.default('none'),
+  /** How each cell samples the source pixels it covers — `dominant` extracts crisp pixel art
+   * from a photo/JPEG of a chart by rejecting outlier pixels; see docs/KNITTING_NOTES.md. */
+  sampling: SamplingModeSchema.default('average'),
   crop: CropRectSchema.optional(),
   /** Makes the pixelated grid tile seamlessly (both axes) before quantization, via the
    * offset+blend technique — see docs/KNITTING_NOTES.md. */

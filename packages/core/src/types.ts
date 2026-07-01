@@ -32,6 +32,14 @@ export interface Grid {
 
 export type DitherMode = 'none' | 'bayer4' | 'floyd-steinberg';
 
+/**
+ * How each output cell's color is drawn from the source pixels it covers.
+ * - `average`: box-filter mean of every covered pixel — best for photos and smooth gradients.
+ * - `dominant`: modal color of the cell, rejecting outlier pixels (grid lines, JPEG ringing,
+ *   anti-aliased edges) — best for extracting crisp pixel art from a chart/logo/screenshot.
+ */
+export type SamplingMode = 'average' | 'dominant';
+
 export interface QuantizeOptions {
   /** Maximum number of distinct colors in the resulting palette (>= 1). */
   maxColors: number;

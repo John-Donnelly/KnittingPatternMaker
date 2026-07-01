@@ -9,6 +9,8 @@ export { medianCutPalette } from './color/quantize.js';
 export { nearestColorIndex } from './color/nearest.js';
 
 export { pixelate } from './image/pixelate.js';
+export { pixelateDominant } from './image/dominantSample.js';
+export { sampleImage } from './image/sample.js';
 export { ditherBayer4, ditherFloydSteinberg } from './image/dither.js';
 export { quantizeGrid } from './image/quantizeGrid.js';
 export { makeSeamless } from './image/seamless.js';
