@@ -94,4 +94,24 @@ describe('medianCutPalette', () => {
     expect(palette[0]).toEqual({ r: 10, g: 10, b: 10 });
     expect(palette[1]).toEqual({ r: 250, g: 250, b: 250 });
   });
+
+  it('spreads the palette evenly across a smooth gradient (no sliver-peeling degeneration)', () => {
+    // Regression test: a uniform 0..255 ramp has no dominant gap — every adjacent pair
+    // differs by the same amount. A naive largest-gap split ties on the FIRST gap and peels
+    // one-sample slivers off the dark end (producing palettes like [2, 11, 24, 37, 50, 158]),
+    // instead of halving the range. The hybrid rule must fall back to median splits here and
+    // cover the full range roughly evenly.
+    const samples: RGB[] = Array.from({ length: 256 }, (_, v) => ({ r: v, g: v, b: v }));
+    const palette = medianCutPalette(samples, 6);
+    expect(palette).toHaveLength(6);
+
+    // Full range covered...
+    expect(palette[0]!.r).toBeLessThan(55);
+    expect(palette[5]!.r).toBeGreaterThan(200);
+    // ...with no giant hole between adjacent palette entries (perfectly even spacing for
+    // 6 buckets of 256 values would be ~42.7 apart).
+    for (let i = 1; i < palette.length; i++) {
+      expect(palette[i]!.r - palette[i - 1]!.r).toBeLessThan(80);
+    }
+  });
 });

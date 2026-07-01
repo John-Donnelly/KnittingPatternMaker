@@ -8,29 +8,69 @@ function gray(values: readonly number[]): RGB[] {
 
 describe('makeSeamless', () => {
   it('matches a hand-computed result for a single horizontal row', () => {
-    // Two smooth runs (0..30 and 100..130) with a hard jump at the wrap boundary
-    // (130 next to 0). blendFraction=0.15, length=8 -> band = min(floor(8*0.15), 3) = 1.
-    const samples = gray([0, 10, 20, 30, 100, 110, 120, 130]);
-    const result = makeSeamless(samples, 8, 1, { horizontal: true, vertical: false });
-    // shift=4: [100,110,120,130,0,10,20,30], seam between index 3 (130) and 4 (0).
-    // band=1, k=1: weight=0.5 -> both blended positions become the exact midpoint, 65.
-    expect(result.map((c) => c.r)).toEqual([100, 110, 120, 65, 65, 10, 20, 30]);
+    // Two flat halves: wrap join (255 next to 0) is a hard seam, interior jump at index 2->3
+    // is part of the design. Black<->white Lab distance is 100 -> raw band ceil(100/12)=9,
+    // capped by maxBand = min(floor((6-2)/2), round(6*0.25)) = 2.
+    // Neighborhood positions (len-2+j)%6 for j=0..3 -> 4,5,0,1.
+    // Anchors: start=line[3]=255, end=line[2]=0. Bridge t=(j+1)/5 -> 204, 153, 102, 51.
+    // Weights: j=0 -> 0.5, j=1 -> 1, j=2 -> 1, j=3 -> 0.5.
+    // out[4]=lerp(255,204,.5)=229.5->230; out[5]=153; out[0]=102; out[1]=lerp(0,51,.5)=25.5->26.
+    const samples = gray([0, 0, 0, 255, 255, 255]);
+    const result = makeSeamless(samples, 6, 1, { horizontal: true, vertical: false });
+    expect(result.map((c) => c.r)).toEqual([102, 26, 0, 255, 230, 153]);
   });
 
   it('matches the same hand-computed result transposed for a single vertical column', () => {
-    const samples = gray([0, 10, 20, 30, 100, 110, 120, 130]);
-    const result = makeSeamless(samples, 1, 8, { horizontal: false, vertical: true });
-    expect(result.map((c) => c.r)).toEqual([100, 110, 120, 65, 65, 10, 20, 30]);
+    const samples = gray([0, 0, 0, 255, 255, 255]);
+    const result = makeSeamless(samples, 1, 6, { horizontal: false, vertical: true });
+    expect(result.map((c) => c.r)).toEqual([102, 26, 0, 255, 230, 153]);
+  });
+
+  it('leaves the interior of the design completely untouched (no offset through the middle)', () => {
+    // A smooth ramp 0..190: wrap join jumps 190, interior is gentle. band computed from the
+    // seam severity, capped at maxBand=5 for len 20 -> neighborhood is positions 15..19,0..4.
+    // Positions 5..14 (the visible middle of the design) must be byte-identical to the input.
+    const samples = gray(Array.from({ length: 20 }, (_, x) => x * 10));
+    const result = makeSeamless(samples, 20, 1, { horizontal: true, vertical: false });
+    for (let x = 5; x <= 14; x++) {
+      expect(result[x]).toEqual(samples[x]);
+    }
+  });
+
+  it('guarantees a small residual jump at the tile join for a hard wrap edge', () => {
+    // Ramp 0..190: original wrap jump is 190. With band 5, the join-adjacent samples both come
+    // purely from the bridge (anchors line[14]=140 and line[5]=50, gap 90 over 11 steps), so
+    // out[19]=140-90*5/11=99.09->99 and out[0]=140-90*6/11=90.9->91 — an 8-value residual.
+    const samples = gray(Array.from({ length: 20 }, (_, x) => x * 10));
+    const result = makeSeamless(samples, 20, 1, { horizontal: true, vertical: false });
+    expect(result[19]?.r).toBe(99);
+    expect(result[0]?.r).toBe(91);
+    expect(Math.abs((result[19]?.r ?? 0) - (result[0]?.r ?? 0))).toBeLessThanOrEqual(9);
+  });
+
+  it('leaves already-tileable high-frequency content (checkerboard) completely unchanged', () => {
+    // Checkerboard: the wrap jump equals the line's own stitch-to-stitch contrast, so the line
+    // already reads as continuous when tiled — the intelligent skip must not smooth it.
+    const samples = gray([0, 255, 0, 255, 0, 255, 0, 255]);
+    const result = makeSeamless(samples, 8, 1, { horizontal: true, vertical: false });
+    expect(result.map((c) => c.r)).toEqual([0, 255, 0, 255, 0, 255, 0, 255]);
+  });
+
+  it('leaves a solid-color grid unchanged', () => {
+    const samples = gray(new Array(24).fill(80));
+    const result = makeSeamless(samples, 6, 4, { horizontal: true, vertical: true });
+    expect(result.map((c) => c.r)).toEqual(new Array(24).fill(80));
   });
 
   it('returns an unchanged copy when neither axis is requested', () => {
     const samples = gray([1, 2, 3, 4]);
     const result = makeSeamless(samples, 4, 1, { horizontal: false, vertical: false });
     expect(result).toEqual(samples);
+    expect(result).not.toBe(samples);
   });
 
   it('leaves an axis unchanged when its length is below the minimum blend dimension', () => {
-    const samples = gray([5, 250, 5]); // length 3 < MIN_DIMENSION_FOR_BLEND
+    const samples = gray([5, 250, 5]);
     const result = makeSeamless(samples, 3, 1, { horizontal: true, vertical: false });
     expect(result.map((c) => c.r)).toEqual([5, 250, 5]);
   });
@@ -41,33 +81,48 @@ describe('makeSeamless', () => {
     ).toThrow();
   });
 
-  it('preserves grid dimensions when both axes are requested', () => {
-    const width = 10;
-    const height = 6;
+  it('preserves grid dimensions and produces integer channels when both axes are requested', () => {
+    const width = 12;
+    const height = 9;
     const samples: RGB[] = Array.from({ length: width * height }, (_, i) => ({
-      r: i % 256,
-      g: (i * 3) % 256,
-      b: (i * 7) % 256,
+      r: (i * 17) % 256,
+      g: (i * 31) % 256,
+      b: (i * 53) % 256,
     }));
     const result = makeSeamless(samples, width, height, { horizontal: true, vertical: true });
     expect(result).toHaveLength(width * height);
+    for (const c of result) {
+      expect(Number.isInteger(c.r)).toBe(true);
+      expect(Number.isInteger(c.g)).toBe(true);
+      expect(Number.isInteger(c.b)).toBe(true);
+    }
   });
 
-  it('measurably reduces the wrap-around discontinuity on a real edge mismatch', () => {
-    // A smooth ramp (0, 10, 20, ..., 190) is continuous everywhere EXCEPT at the wrap point
-    // (190 next to 0, a jump of 190) -- exactly the case seamless tiling exists to fix. Since
-    // the ramp is smooth at its own center too, the offset moves that already-smooth content
-    // to the new edges, and the actual discontinuity gets relocated to the middle and blended.
-    const width = 20;
-    const height = 1;
-    const samples = gray(Array.from({ length: width }, (_, x) => x * 10));
-    const before = Math.abs((samples[0]?.r ?? 0) - (samples[width - 1]?.r ?? 0));
+  it('reduces the wrap mismatch on BOTH axes of a 2D gradient', () => {
+    // Diagonal gradient: hard wrap seams on both axes.
+    const width = 16;
+    const height = 12;
+    const samples: RGB[] = [];
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const v = Math.round(((x / (width - 1)) * 0.5 + (y / (height - 1)) * 0.5) * 255);
+        samples.push({ r: v, g: v, b: v });
+      }
+    }
+    const result = makeSeamless(samples, width, height, { horizontal: true, vertical: true });
 
-    const result = makeSeamless(samples, width, height, { horizontal: true, vertical: false });
-    const after = Math.abs((result[0]?.r ?? 0) - (result[width - 1]?.r ?? 0));
-
-    expect(before).toBe(190);
-    expect(after).toBeLessThan(before);
+    // Every row's join and every column's join should be dramatically smaller than the
+    // original wrap jumps (~128 on each axis).
+    for (let y = 0; y < height; y++) {
+      const rowJump = Math.abs(
+        (result[y * width + width - 1]?.r ?? 0) - (result[y * width]?.r ?? 0),
+      );
+      expect(rowJump).toBeLessThan(40);
+    }
+    for (let x = 0; x < width; x++) {
+      const colJump = Math.abs((result[(height - 1) * width + x]?.r ?? 0) - (result[x]?.r ?? 0));
+      expect(colJump).toBeLessThan(40);
+    }
   });
 
   it('is deterministic across repeated calls', () => {
@@ -81,15 +136,5 @@ describe('makeSeamless', () => {
     const a = makeSeamless(samples, width, height, { horizontal: true, vertical: true });
     const b = makeSeamless(samples, width, height, { horizontal: true, vertical: true });
     expect(a).toEqual(b);
-  });
-
-  it('produces integer RGB channel values', () => {
-    const samples = gray([0, 10, 20, 30, 100, 110, 120, 130]);
-    const result = makeSeamless(samples, 8, 1, { horizontal: true, vertical: false });
-    for (const c of result) {
-      expect(Number.isInteger(c.r)).toBe(true);
-      expect(Number.isInteger(c.g)).toBe(true);
-      expect(Number.isInteger(c.b)).toBe(true);
-    }
   });
 });

@@ -101,24 +101,40 @@ export function medianCutPalette(samples: readonly RGB[], maxColors: number): RG
       .slice()
       .sort((a, b) => a[channel] - b[channel] || a.r - b.r || a.g - b.g || a.b - b.b);
 
-    // Split at the largest gap between consecutive VALUES, not the middle index. Splitting by
-    // index alone balances sample *count*, which can slice a genuinely separated cluster in
-    // half while merging two unrelated clusters together (e.g. a flat red/blue flag with a
-    // thin red-white blend row at the stripe edge: index-median would lump part of red with
-    // blue into a muddy purple that appears nowhere in the source). Splitting at the widest
-    // value gap keeps naturally separated colors apart instead.
-    let splitAt = Math.ceil(sorted.length / 2);
+    // Hybrid split point:
+    //
+    // - If the sorted values contain a DOMINANT gap (at least twice the box's mean adjacent
+    //   gap), split there: index-median splitting balances sample *count*, which can slice a
+    //   genuinely separated cluster in half while merging two unrelated clusters together
+    //   (e.g. a flat red/blue flag: the median would lump part of red with blue into a muddy
+    //   purple that appears nowhere in the source). Ties between equal dominant gaps break
+    //   toward the median index (then the lower index) so the split stays balanced.
+    // - Otherwise — smooth content like a photo gradient, where every adjacent gap is about
+    //   the same — fall back to the median index. Always taking the first-largest gap here
+    //   degenerates badly: on a uniform ramp all gaps tie, the first one wins, and each split
+    //   peels a sliver off one end instead of halving the box, cramming most of the palette
+    //   into one corner of the range.
     let widestGap = -1;
+    let gapSum = 0;
+    let gapSplitAt = -1;
+    const median = sorted.length / 2;
     for (let i = 1; i < sorted.length; i++) {
       const prev = sorted[i - 1];
       const cur = sorted[i];
       if (!prev || !cur) continue;
       const gap = cur[channel] - prev[channel];
-      if (gap > widestGap) {
+      gapSum += gap;
+      if (
+        gap > widestGap ||
+        (gap === widestGap && Math.abs(i - median) < Math.abs(gapSplitAt - median))
+      ) {
         widestGap = gap;
-        splitAt = i;
+        gapSplitAt = i;
       }
     }
+    const meanGap = gapSum / (sorted.length - 1);
+    const splitAt =
+      gapSplitAt > 0 && widestGap >= meanGap * 2 ? gapSplitAt : Math.ceil(sorted.length / 2);
 
     boxes.splice(
       splitIndex,

@@ -100,20 +100,29 @@ of the chart side by side and/or stacked, and the join won't show a hard seam. T
 allover colorwork motifs, borders that wrap around a hat/cuff, or blanket squares meant to be
 worked in a grid.
 
-- Implementation: the standard "offset + blend" technique (the same idea behind Photoshop's
-  Offset filter + heal-the-seam workflow). Each axis is circularly shifted by half its length —
-  which relocates the wrap-around seam to the middle of the grid and moves already-adjacent
-  (already locally continuous) original content out to the new edges — then a symmetric band
-  around the relocated seam is cross-faded to smooth out the discontinuity that used to be at
-  the wrap boundary. See `packages/core/src/image/seamless.ts`.
+- Implementation (`packages/core/src/image/seamless.ts`): the two edges of each row (and/or
+  column) are blended **across the tile join itself**, leaving the interior of the picture
+  completely untouched. This deliberately avoids the classic "offset + blend" technique, which
+  circularly shifts the image and cross-fades a band right through the _middle_ of the design —
+  fine for abstract textures, ruinous for a picture with a subject in it.
+- The blend is **content-adaptive, per row/column**, so it handles almost any input sensibly:
+  - Each line's wrap-edge mismatch is measured perceptually (CIE Lab distance) and compared to
+    the line's own average stitch-to-stitch contrast. Lines whose edges already read as
+    continuous when tiled — solid colors, checkerboards, noise, anything high-frequency — are
+    left **byte-identical to the input**, not needlessly smoothed.
+  - Lines with a real seam get a blend band sized to the jump's severity (a gentle mismatch
+    gets a 1–2 stitch touch-up; a hard edge gets a wider ramp), capped at 25% of the axis so
+    the design always dominates. Band widths are smoothed across neighboring lines so the
+    transition zone forms a coherent region rather than a ragged per-line comb.
+  - Within the band, samples are pulled toward a straight "bridge" drawn between the two anchor
+    stitches just outside the band, with full weight at the join and decaying weight toward the
+    anchors. Because the two join-adjacent stitches come purely from the bridge, the residual
+    jump at the tile join is **bounded and small for any input** (anchor gap ÷ band width), not
+    merely "as continuous as the source happened to be somewhere".
 - Applied to the pixelated grid (post-crop/pixelate, pre-quantize), not the original photo, so
-  the blend band is measured in stitches and lines up with what actually ends up in the chart.
-- **This does not guarantee the two new edges are byte-identical colors** — it guarantees they're
-  as continuous as the source image already is at that (formerly central) point, which is the
-  expected behavior of this technique on a real photo. In practice, because the result is then
-  quantized down to a small palette, adjacent original pixels often do end up in the same color
-  bucket and the tiled edges match exactly — but for images with a hard edge running through
-  their own center, don't expect a perfect match.
+  the blend band is measured in stitches and lines up with what actually ends up in the chart —
+  and after quantization to a small palette, the near-matching join stitches usually land in
+  the same color bucket, making the tiled edges match exactly.
 - To actually knit a seamless repeat: cast on multiple widths of the chart's stitch count side
   by side for a horizontal repeat, and/or work the full chart height multiple times in a row for
   a vertical repeat, continuing the row-by-row instructions exactly as written each time (chart

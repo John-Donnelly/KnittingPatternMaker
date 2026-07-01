@@ -66,15 +66,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   edge at the wrap boundary produced _exactly matching_ quantized colors at both edges after
   enabling seamless mode (verified via direct grid comparison and by reading the rendered PDF).
 
+### Changed
+
+- **Seamless tiling rewritten to preserve the design and handle almost any input.** The first
+  implementation used the classic "offset + blend" technique: it circularly shifted the image
+  by half its length and cross-faded the relocated seam — which lands **in the middle of the
+  picture**, smearing a band right through the subject, and only made the tiled edges as
+  continuous as the source happened to be at its (former) center. `makeSeamless` now blends
+  across the tile join itself and adapts to the content per row/column: the interior of the
+  design is byte-identical to the input; each line's wrap mismatch is measured perceptually
+  (CIE Lab) against the line's own stitch-to-stitch contrast, so already-tileable content
+  (solids, checkerboards, noise) is left completely untouched; lines with a real seam get a
+  blend band sized to the jump's severity (capped at 25% of the axis, smoothed across
+  neighboring lines), pulling edge stitches toward a bridge between two interior anchors with
+  full weight at the join — which bounds the residual jump at the join for **any** input
+  (anchor gap ÷ band width) instead of relying on the source being continuous somewhere.
+  API/UI surface unchanged (same `seamless` flag). Test suite rewritten: 12 core tests with
+  exact hand-computed expectations, including interior-untouched, checkerboard-skip,
+  bounded-join-residual, and 2D both-axes cases.
+
 ### Fixed
 
+- **Median-cut degenerated badly on smooth gradients (i.e. most photos).** The earlier
+  largest-gap split fix (below) introduced its own failure mode: on content where every
+  adjacent sorted color differs by about the same amount — a gradient, sky, skin, any smooth
+  region — all gaps tie, the first one wins, and each split peels a one-sample sliver off one
+  end of the box instead of halving it. A uniform 0→255 ramp quantized to 6 colors produced
+  the palette [2, 11, 24, 37, 50, 158]: five near-black slivers and one giant box. Now a
+  hybrid rule: split at the widest gap only when it is _dominant_ (≥ 2× the box's mean
+  adjacent gap, ties broken toward the median index); otherwise fall back to the median split.
+  The same ramp now yields [28, 71, 106, 145, 180, 227]. The flag/logo cluster behavior is
+  unchanged (its dominant-gap test still passes). Found via end-to-end browser verification of
+  the seamless-tiling rework against the live API; regression test added.
 - `packages/core` median-cut quantization now splits a box at the largest **value** gap between
   consecutive sorted colors instead of the index-median. Index-median splitting balances sample
   _count_, which could merge two genuinely separated, far-apart colors (e.g. red and blue in a
   flat-color flag/logo image) into a muddy in-between color while slicing a real cluster in
   half. Found via manual end-to-end verification (rendered PDF/PNG) on a synthetic 3-stripe
   flag image, which is exactly the kind of flat-color, few-distinct-colors input this tool
-  needs to handle well.
+  needs to handle well. (Superseded by the hybrid rule above.)
 - `apps/web` chart canvas and crop preview used fixed pixel widths that overflowed narrow
   (mobile) viewports; both now scale to their container (`max-width: 100%`, percentage-based
   crop overlay) instead of a hardcoded display width. Found via manual mobile-viewport testing.
