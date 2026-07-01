@@ -44,6 +44,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `packages/core`'s own deterministic code, not libvips's). 12 integration tests covering
   success paths, determinism, and validation/corruption error cases.
 
+- `apps/web` frontend: upload an image, tune technique/dimensions/gauge/colors/dithering/crop,
+  and see a live preview (debounced calls to `/api/pattern`) — chart, color legend with
+  per-color yardage, row-by-row instructions, and technique-specific notes (float/many-color
+  warnings, bobbin count, or K/P key). Export via the same PDF/PNG endpoints, or copy a
+  shareable link. Opening a shared link renders entirely client-side (`buildPatternResult`/
+  `buildYardageEstimate`/`decodePatternSpec` all run in the browser via `packages/core`) with
+  **no** `/api/pattern` call — confirmed by inspecting network traffic during manual testing.
+  15 component/unit tests plus a full manual browser walkthrough (see Fixed, below) of all
+  three techniques, both exports, the share-link round trip, and mobile/desktop layouts.
+
 ### Fixed
 
 - `packages/core` median-cut quantization now splits a box at the largest **value** gap between
@@ -53,3 +63,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   half. Found via manual end-to-end verification (rendered PDF/PNG) on a synthetic 3-stripe
   flag image, which is exactly the kind of flat-color, few-distinct-colors input this tool
   needs to handle well.
+- `apps/web` chart canvas and crop preview used fixed pixel widths that overflowed narrow
+  (mobile) viewports; both now scale to their container (`max-width: 100%`, percentage-based
+  crop overlay) instead of a hardcoded display width. Found via manual mobile-viewport testing.
