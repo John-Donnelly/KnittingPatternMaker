@@ -1,7 +1,20 @@
 import { unzlibSync, zlibSync } from 'fflate';
 import type { GaugeSpec, Grid, RGB, Technique } from '../types.js';
 import { decodeBase64Url, encodeBase64Url } from './base64url.js';
-import { MAX_GRID_DIMENSION, MAX_SHARE_LINK_LENGTH } from '../limits.js';
+import { MAX_COLORS, MAX_GRID_DIMENSION, MAX_SHARE_LINK_LENGTH } from '../limits.js';
+
+/** Matches the HTTP API's GaugeSpecSchema bounds (apps/api/src/schemas.ts). */
+const MAX_GAUGE_VALUE = 200;
+
+function isValidGaugeValue(value: unknown): value is number {
+  return (
+    typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= MAX_GAUGE_VALUE
+  );
+}
+
+function isValidColorChannel(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 255;
+}
 
 export interface PatternSpec {
   technique: Technique;
@@ -102,11 +115,27 @@ export function decodePatternSpec(encoded: string): PatternSpec {
   if (!Array.isArray(parsed.i) || parsed.i.length !== parsed.w * parsed.h) {
     throw new Error('Corrupted pattern link: index/grid size mismatch');
   }
-  if (!Array.isArray(parsed.p) || parsed.p.length === 0) {
-    throw new Error('Corrupted pattern link: missing palette');
+  if (!Array.isArray(parsed.p) || parsed.p.length === 0 || parsed.p.length > MAX_COLORS) {
+    throw new Error('Corrupted pattern link: invalid palette size');
+  }
+  if (
+    parsed.p.some(
+      (rgb) => !Array.isArray(rgb) || rgb.length !== 3 || !rgb.every(isValidColorChannel),
+    )
+  ) {
+    throw new Error('Corrupted pattern link: invalid palette color');
   }
   if (parsed.i.some((idx) => !Number.isInteger(idx) || idx < 0 || idx >= parsed.p.length)) {
     throw new Error('Corrupted pattern link: index out of palette range');
+  }
+  if (
+    parsed.g !== undefined &&
+    (typeof parsed.g !== 'object' ||
+      parsed.g === null ||
+      !isValidGaugeValue(parsed.g.s) ||
+      !isValidGaugeValue(parsed.g.r))
+  ) {
+    throw new Error('Corrupted pattern link: invalid gauge');
   }
 
   const palette: RGB[] = parsed.p.map(([r, g, b]) => ({ r, g, b }));

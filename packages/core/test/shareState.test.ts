@@ -6,7 +6,7 @@ import {
   type PatternSpec,
 } from '../src/pattern/shareState.js';
 import { encodeBase64Url } from '../src/pattern/base64url.js';
-import { MAX_GRID_DIMENSION, MAX_SHARE_LINK_LENGTH } from '../src/limits.js';
+import { MAX_COLORS, MAX_GRID_DIMENSION, MAX_SHARE_LINK_LENGTH } from '../src/limits.js';
 import type { Grid } from '../src/types.js';
 
 function sampleSpec(): PatternSpec {
@@ -129,5 +129,48 @@ describe('encodePatternSpec / decodePatternSpec', () => {
     expect(encoded.length).toBeLessThan(MAX_SHARE_LINK_LENGTH);
     const decoded = decodePatternSpec(encoded);
     expect(decoded.grid.width).toBe(size);
+  });
+
+  it('rejects a zero or negative gauge value (would divide-by-zero / invert downstream math)', () => {
+    for (const badGauge of [
+      { s: 0, r: 30 },
+      { s: -5, r: 30 },
+      { s: 20, r: 0 },
+    ]) {
+      const payload = { v: 1, t: 'stranded', w: 1, h: 1, p: [[0, 0, 0]], i: [0], g: badGauge };
+      const compressed = zlibSync(new TextEncoder().encode(JSON.stringify(payload)));
+      const encoded = encodeBase64Url(compressed);
+      expect(() => decodePatternSpec(encoded)).toThrow(/gauge/i);
+    }
+  });
+
+  it('rejects a gauge value beyond the 200 sts/rows-per-4in bound', () => {
+    const payload = {
+      v: 1,
+      t: 'stranded',
+      w: 1,
+      h: 1,
+      p: [[0, 0, 0]],
+      i: [0],
+      g: { s: 201, r: 30 },
+    };
+    const compressed = zlibSync(new TextEncoder().encode(JSON.stringify(payload)));
+    const encoded = encodeBase64Url(compressed);
+    expect(() => decodePatternSpec(encoded)).toThrow(/gauge/i);
+  });
+
+  it('rejects an out-of-range palette color channel', () => {
+    const payload = { v: 1, t: 'stranded', w: 1, h: 1, p: [[300, 0, 0]], i: [0] };
+    const compressed = zlibSync(new TextEncoder().encode(JSON.stringify(payload)));
+    const encoded = encodeBase64Url(compressed);
+    expect(() => decodePatternSpec(encoded)).toThrow(/palette color/i);
+  });
+
+  it('rejects a palette larger than MAX_COLORS', () => {
+    const bigPalette = Array.from({ length: MAX_COLORS + 1 }, (_, i) => [i % 256, 0, 0]);
+    const payload = { v: 1, t: 'stranded', w: 1, h: 1, p: bigPalette, i: [0] };
+    const compressed = zlibSync(new TextEncoder().encode(JSON.stringify(payload)));
+    const encoded = encodeBase64Url(compressed);
+    expect(() => decodePatternSpec(encoded)).toThrow(/palette size/i);
   });
 });

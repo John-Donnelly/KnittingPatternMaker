@@ -86,3 +86,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   WS/RS stitch inversion, gauge math, yardage caveats, quantization approach), both already
   referenced from the UI and PDF output. Rewrote `README.md` to describe the working app
   instead of the original scaffold.
+- An independent review pass over the full codebase (against the docs' own claims) found that
+  `decodePatternSpec` validated grid dimensions, indices, and palette length/index range, but
+  never validated the gauge or palette RGB channel values from a shared link. A crafted link
+  with e.g. `stitchesPer4In: 0` reached `stitchAspectRatio`, which explicitly throws on a
+  non-positive gauge — uncaught, that broke the shared-pattern page entirely. Now validated
+  with the same bounds the HTTP API's zod schema uses (positive, ≤ 200; palette channels
+  0–255 integers; palette length ≤ MAX_COLORS). 6 new tests.

@@ -45,6 +45,13 @@ export function quantizeTexture(
   return quantizeGrid(toGrayscaleSamples(samples), width, height, { maxColors: 2, dither });
 }
 
+/**
+ * Relies on `medianCutPalette` always returning its palette sorted darkest-to-lightest (see
+ * `color/quantize.ts`), so index 0 is guaranteed to be the darkest color whenever there's more
+ * than one. If that sort order ever changes, this — and every texture pattern's K/P
+ * assignment — silently inverts, so `medianCutPalette`'s "orders darkest to lightest" contract
+ * (asserted by `quantize.test.ts`'s ordering test) must hold.
+ */
 function isDarkIndex(paletteIndex: number, paletteLength: number): boolean {
   return paletteLength > 1 && paletteIndex === 0;
 }
