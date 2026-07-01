@@ -1,7 +1,6 @@
 import type { FastifyInstance } from 'fastify';
+import { buildPatternResult, buildYardageEstimate, deserializeGrid } from 'knitting-pattern-core';
 import { PatternSpecBodySchema } from '../schemas.js';
-import { deserializeGrid } from '../serialize.js';
-import { buildPatternResult, buildYardageEstimate } from '../patternBuilder.js';
 import { renderPatternPdf } from '../export/pdf.js';
 import { renderChartPng } from '../export/png.js';
 

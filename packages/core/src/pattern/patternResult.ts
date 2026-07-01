@@ -1,19 +1,14 @@
+import type { GaugeSpec, Grid, Technique } from '../types.js';
+import { estimateYardage, type YardageEstimate } from './yarnEstimate.js';
 import {
-  estimateYardage,
-  generateIntarsiaPattern,
   generateStrandedPattern,
-  generateTexturePattern,
   type ColorworkRowInstruction,
   type FloatWarning,
-  type GaugeSpec,
-  type Grid,
-  type IntarsiaBlock,
   type ManyColorRowWarning,
-  type Technique,
-  type TextureRowInstruction,
-  type YardageEstimate,
-} from 'knitting-pattern-core';
-import { serializeNumberMap } from './serialize.js';
+} from './strandedColorwork.js';
+import { generateIntarsiaPattern, type IntarsiaBlock } from './intarsia.js';
+import { generateTexturePattern, type TextureRowInstruction } from './textureKnitPurl.js';
+import { serializeNumberMap } from './gridJson.js';
 
 export interface StrandedPatternJson {
   technique: 'stranded';
@@ -45,9 +40,10 @@ function floatStitchesByColor(patternResult: PatternResultJson): Map<number, num
 }
 
 /**
- * Regenerates the technique-specific instructions for a grid. Pure and deterministic: the
- * same (technique, grid) pair always reproduces the identical result, so export endpoints can
- * reconstruct a pattern from just the grid without needing the original image or a cache.
+ * Regenerates the technique-specific, JSON-safe instructions for a grid. Pure and
+ * deterministic: the same (technique, grid) pair always reproduces the identical result, so
+ * both the frontend (typing the `/api/pattern` response) and the backend (reconstructing a
+ * pattern from just a grid for export, no original image or cache needed) share one definition.
  */
 export function buildPatternResult(technique: Technique, grid: Grid): PatternResultJson {
   switch (technique) {

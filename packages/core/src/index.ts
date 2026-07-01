@@ -48,3 +48,14 @@ export { encodePatternSpec, decodePatternSpec } from './pattern/shareState.js';
 export type { PatternSpec } from './pattern/shareState.js';
 
 export { encodeBase64Url, decodeBase64Url } from './pattern/base64url.js';
+
+export { serializeGrid, deserializeGrid, serializeNumberMap } from './pattern/gridJson.js';
+export type { GridJson } from './pattern/gridJson.js';
+
+export { buildPatternResult, buildYardageEstimate } from './pattern/patternResult.js';
+export type {
+  PatternResultJson,
+  StrandedPatternJson,
+  IntarsiaPatternJson,
+  TexturePatternJson,
+} from './pattern/patternResult.js';

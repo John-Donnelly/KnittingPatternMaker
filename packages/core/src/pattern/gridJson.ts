@@ -1,5 +1,6 @@
-import type { Grid, RGB } from 'knitting-pattern-core';
+import type { Grid, RGB } from '../types.js';
 
+/** JSON-safe (no typed arrays) mirror of {@link Grid}, used at every API/URL boundary. */
 export interface GridJson {
   width: number;
   height: number;

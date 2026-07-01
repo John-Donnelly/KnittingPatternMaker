@@ -12,11 +12,11 @@ import {
   stitchAspectRatio,
   type GaugeSpec,
   type Grid,
+  type PatternResultJson,
   type RGB,
   type Technique,
   type YardageEstimate,
 } from 'knitting-pattern-core';
-import type { PatternResultJson } from '../patternBuilder.js';
 
 const MARGIN = 36;
 const [PAGE_WIDTH, PAGE_HEIGHT] = PageSizes.Letter;

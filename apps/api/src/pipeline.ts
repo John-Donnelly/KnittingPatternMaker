@@ -1,22 +1,21 @@
 import sharp from 'sharp';
 import {
+  buildPatternResult,
+  buildYardageEstimate,
   encodePatternSpec,
   finishedSize,
   pixelate,
   quantizeGrid,
   quantizeTexture,
+  serializeGrid,
   suggestedCropRect,
   type CropRect,
   type Grid,
+  type GridJson,
+  type PatternResultJson,
   type PixelBuffer,
 } from 'knitting-pattern-core';
 import type { PatternOptions } from './schemas.js';
-import {
-  buildPatternResult,
-  buildYardageEstimate,
-  type PatternResultJson,
-} from './patternBuilder.js';
-import { serializeGrid, type GridJson } from './serialize.js';
 
 export class InvalidImageError extends Error {}
 
