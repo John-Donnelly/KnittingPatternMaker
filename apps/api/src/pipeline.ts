@@ -4,6 +4,7 @@ import {
   buildYardageEstimate,
   encodePatternSpec,
   finishedSize,
+  makeSeamless,
   pixelate,
   quantizeGrid,
   quantizeTexture,
@@ -54,6 +55,7 @@ export interface PipelineResult {
   pattern: PatternResultJson;
   yardage: ReturnType<typeof buildYardageEstimate>;
   shareLink: string;
+  seamless: boolean;
 }
 
 /**
@@ -77,7 +79,13 @@ export async function runPipeline(
       options.gauge,
     );
 
-  const samples = pixelate(source, crop, options.widthStitches, options.heightRows);
+  const pixelated = pixelate(source, crop, options.widthStitches, options.heightRows);
+  const samples = options.seamless
+    ? makeSeamless(pixelated, options.widthStitches, options.heightRows, {
+        horizontal: true,
+        vertical: true,
+      })
+    : pixelated;
 
   const grid: Grid =
     options.technique === 'texture'
@@ -102,6 +110,7 @@ export async function runPipeline(
     pattern,
     yardage,
     shareLink,
+    seamless: options.seamless,
     ...(options.gauge
       ? {
           finishedSize: finishedSize(

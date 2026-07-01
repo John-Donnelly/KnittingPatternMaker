@@ -39,6 +39,7 @@ const DEFAULT_FORM: FormState = {
   maxColors: 8,
   dither: 'none',
   cropMode: 'auto',
+  seamless: false,
 };
 
 function formGauge(form: FormState): GaugeSpec | undefined {
@@ -122,6 +123,7 @@ export function App() {
       maxColors: debouncedForm.maxColors,
       dither: debouncedForm.dither,
       crop,
+      seamless: debouncedForm.seamless,
       ...(gauge ? { gauge } : {}),
     };
 
@@ -214,10 +216,12 @@ export function App() {
                   specBody={{
                     technique: form.technique,
                     grid: response.grid,
+                    seamless: response.seamless,
                     ...(gauge ? { gauge } : {}),
                   }}
                   shareUrl={`${window.location.origin}${window.location.pathname}#p=${response.shareLink}`}
                   finishedSize={response.finishedSize}
+                  seamless={response.seamless}
                 />
               </>
             )}
@@ -245,6 +249,7 @@ interface ResultViewProps {
   specBody: PatternSpecBody;
   shareUrl: string;
   finishedSize?: { widthIn: number; heightIn: number } | undefined;
+  seamless?: boolean | undefined;
 }
 
 function ResultView({
@@ -255,6 +260,7 @@ function ResultView({
   specBody,
   shareUrl,
   finishedSize,
+  seamless,
 }: ResultViewProps) {
   return (
     <div className="results">
@@ -262,6 +268,12 @@ function ResultView({
       {finishedSize && (
         <p className="hint">
           Finished size: ~{finishedSize.widthIn.toFixed(1)}in × {finishedSize.heightIn.toFixed(1)}in
+        </p>
+      )}
+      {seamless && (
+        <p className="hint">
+          This pattern tiles seamlessly — repeat the chart left-right and/or top-bottom to continue
+          the design.
         </p>
       )}
       <LegendList grid={grid} yardage={yardage} />

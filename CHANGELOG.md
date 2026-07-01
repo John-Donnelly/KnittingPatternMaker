@@ -53,6 +53,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **no** `/api/pattern` call — confirmed by inspecting network traffic during manual testing.
   15 component/unit tests plus a full manual browser walkthrough (see Fixed, below) of all
   three techniques, both exports, the share-link round trip, and mobile/desktop layouts.
+- **Seamless tiling** (`packages/core/src/image/seamless.ts`, `makeSeamless`): an opt-in option
+  that makes the pixelated grid repeatable in both directions using the standard "offset +
+  blend" technique — each axis is circularly shifted by half its length (relocating the
+  wrap-around seam to the middle, where already-locally-continuous original content lands at
+  the new edges) and the relocated seam is cross-faded over a symmetric band. Applied to the
+  pixelated grid before quantization, so the blend band is measured in stitches. Wired through
+  `/api/pattern` (`seamless` option, echoed in the response) and `/api/export/pdf` (prints a
+  "tiles seamlessly" note when set); the UI exposes it as a single checkbox applying both axes.
+  9 hand-verified core unit tests (including an exact hand-computed blend result) plus 2 API
+  integration tests. Manually verified end-to-end: a synthetic ramp image with a 176-value hard
+  edge at the wrap boundary produced _exactly matching_ quantized colors at both edges after
+  enabling seamless mode (verified via direct grid comparison and by reading the rendered PDF).
 
 ### Fixed
 
@@ -77,6 +89,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   validated `grid.indices` length but not `grid.palette` length, so a crafted export request
   could ask for an arbitrarily large color legend. `MAX_GRID_DIMENSION`/`MAX_COLORS` moved from
   being duplicated in `apps/api` and `apps/web` into a single `packages/core/src/limits.ts`.
+- **`npm run typecheck` never actually checked any workspace's `test/` directory.** Each
+  workspace's `tsconfig.json` scopes `include` to `src` (needed so `apps/api`/`packages/core`'s
+  build doesn't try to emit compiled output for test files outside `rootDir`), and the root
+  `typecheck` script pointed straight at those build configs. Vitest itself doesn't type-check
+  (it strips types via esbuild), so test files had _no_ type checking at all — this stayed
+  invisible because it only surfaces as a missing-property/wrong-type error, and the code
+  itself still ran fine. Caught it by hand while wiring up the seamless-tiling feature: adding
+  a required field to `FormState` didn't produce the type error I expected in
+  `ControlsPanel.test.tsx`. Fixed with a separate `tsconfig.typecheck.json` per workspace
+  (`apps/api`, `packages/core`) that includes both `src` and `test` without the build config's
+  `rootDir`/`outDir` constraints; `apps/web`'s config already had no such constraint, so it
+  just needed `test` added to `include` directly. This also surfaced a real, previously-silent
+  gap: `apps/api`'s test suite used `supertest` without `@types/supertest` installed, so several
+  callback parameters were implicitly `any`.
 
 ### Docs
 

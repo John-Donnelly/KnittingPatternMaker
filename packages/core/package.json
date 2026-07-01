@@ -16,7 +16,7 @@
     "dev": "tsc -b --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json"
   },
   "dependencies": {
     "fflate": "^0.8.3"

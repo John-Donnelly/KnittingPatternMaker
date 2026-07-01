@@ -93,6 +93,32 @@ exact expected output.
   Dithering is more reasonable for the knit/purl texture technique, where isolated stitches are
   just fine texturally.
 
+## Seamless tiling
+
+Turning on "Seamless tiling" makes the pixelated grid repeatable — you can knit multiple copies
+of the chart side by side and/or stacked, and the join won't show a hard seam. This matters for
+allover colorwork motifs, borders that wrap around a hat/cuff, or blanket squares meant to be
+worked in a grid.
+
+- Implementation: the standard "offset + blend" technique (the same idea behind Photoshop's
+  Offset filter + heal-the-seam workflow). Each axis is circularly shifted by half its length —
+  which relocates the wrap-around seam to the middle of the grid and moves already-adjacent
+  (already locally continuous) original content out to the new edges — then a symmetric band
+  around the relocated seam is cross-faded to smooth out the discontinuity that used to be at
+  the wrap boundary. See `packages/core/src/image/seamless.ts`.
+- Applied to the pixelated grid (post-crop/pixelate, pre-quantize), not the original photo, so
+  the blend band is measured in stitches and lines up with what actually ends up in the chart.
+- **This does not guarantee the two new edges are byte-identical colors** — it guarantees they're
+  as continuous as the source image already is at that (formerly central) point, which is the
+  expected behavior of this technique on a real photo. In practice, because the result is then
+  quantized down to a small palette, adjacent original pixels often do end up in the same color
+  bucket and the tiled edges match exactly — but for images with a hard edge running through
+  their own center, don't expect a perfect match.
+- To actually knit a seamless repeat: cast on multiple widths of the chart's stitch count side
+  by side for a horizontal repeat, and/or work the full chart height multiple times in a row for
+  a vertical repeat, continuing the row-by-row instructions exactly as written each time (chart
+  row 1 always starts a new repeat).
+
 ## Determinism
 
 Every stage above — pixelation, quantization, dithering, pattern generation, yardage estimation,

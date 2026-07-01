@@ -15,6 +15,7 @@ export interface FormState {
   maxColors: number;
   dither: DitherMode;
   cropMode: 'auto' | 'full';
+  seamless: boolean;
 }
 
 interface Props {
@@ -154,6 +155,15 @@ export function ControlsPanel({ value, onChange }: Props) {
           <option value="auto">Auto-crop to match gauge proportions (recommended)</option>
           <option value="full">Use full image (may stretch)</option>
         </select>
+      </label>
+
+      <label className="field field--checkbox">
+        <input
+          type="checkbox"
+          checked={value.seamless}
+          onChange={(e) => set('seamless', e.target.checked)}
+        />
+        <span>Seamless tiling (repeat the pattern left-right and top-bottom with no seam)</span>
       </label>
     </fieldset>
   );

@@ -11,6 +11,8 @@ export { nearestColorIndex } from './color/nearest.js';
 export { pixelate } from './image/pixelate.js';
 export { ditherBayer4, ditherFloydSteinberg } from './image/dither.js';
 export { quantizeGrid } from './image/quantizeGrid.js';
+export { makeSeamless } from './image/seamless.js';
+export type { SeamlessOptions } from './image/seamless.js';
 export {
   DEFAULT_GAUGE,
   stitchAspectRatio,

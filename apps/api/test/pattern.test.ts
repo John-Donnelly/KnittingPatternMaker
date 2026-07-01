@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { FastifyInstance } from 'fastify';
 import { buildServer } from '../src/server.js';
-import { makeTestImagePng } from './helpers.js';
+import { makeRampImagePng, makeTestImagePng } from './helpers.js';
 
 describe('POST /api/pattern', () => {
   let app: FastifyInstance;
@@ -90,6 +90,57 @@ describe('POST /api/pattern', () => {
 
     expect(first.body.grid).toEqual(second.body.grid);
     expect(first.body.pattern).toEqual(second.body.pattern);
+    expect(first.body.shareLink).toBe(second.body.shareLink);
+  });
+
+  it('echoes the seamless flag and changes the result compared to non-seamless', async () => {
+    const image = await makeRampImagePng(40, 10);
+    const baseOptions = {
+      technique: 'stranded',
+      widthStitches: 20,
+      heightRows: 8,
+      maxColors: 8,
+      dither: 'none',
+    };
+
+    const withoutSeamless = await request(app.server)
+      .post('/api/pattern')
+      .field('options', JSON.stringify({ ...baseOptions, seamless: false }))
+      .attach('image', image, 'ramp.png');
+    const withSeamless = await request(app.server)
+      .post('/api/pattern')
+      .field('options', JSON.stringify({ ...baseOptions, seamless: true }))
+      .attach('image', image, 'ramp.png');
+
+    expect(withoutSeamless.status).toBe(200);
+    expect(withSeamless.status).toBe(200);
+    expect(withoutSeamless.body.seamless).toBe(false);
+    expect(withSeamless.body.seamless).toBe(true);
+    // Seamless blending alters the pixel data before quantization, so the resulting grid
+    // should differ from the non-seamless run on this hard-wrap-edge test image.
+    expect(withSeamless.body.grid).not.toEqual(withoutSeamless.body.grid);
+  });
+
+  it('produces identical results for repeated seamless calls with the same input (determinism)', async () => {
+    const image = await makeRampImagePng(30, 30);
+    const options = {
+      technique: 'texture',
+      widthStitches: 12,
+      heightRows: 12,
+      dither: 'none',
+      seamless: true,
+    };
+
+    const first = await request(app.server)
+      .post('/api/pattern')
+      .field('options', JSON.stringify(options))
+      .attach('image', image, 'ramp.png');
+    const second = await request(app.server)
+      .post('/api/pattern')
+      .field('options', JSON.stringify(options))
+      .attach('image', image, 'ramp.png');
+
+    expect(first.body.grid).toEqual(second.body.grid);
     expect(first.body.shareLink).toBe(second.body.shareLink);
   });
 

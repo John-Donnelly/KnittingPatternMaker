@@ -17,6 +17,7 @@ export interface PatternOptions {
   maxColors: number;
   dither: DitherMode;
   crop?: CropRect;
+  seamless: boolean;
 }
 
 export interface PatternResponse {
@@ -27,12 +28,14 @@ export interface PatternResponse {
   pattern: PatternResultJson;
   yardage: YardageEstimate;
   shareLink: string;
+  seamless: boolean;
 }
 
 export interface PatternSpecBody {
   technique: Technique;
   gauge?: GaugeSpec;
   grid: GridJson;
+  seamless?: boolean;
 }
 
 export class ApiError extends Error {

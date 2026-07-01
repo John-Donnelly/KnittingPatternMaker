@@ -31,6 +31,9 @@ export const PatternOptionsSchema = z.object({
   maxColors: z.number().int().min(1).max(MAX_COLORS).default(8),
   dither: DitherModeSchema.default('none'),
   crop: CropRectSchema.optional(),
+  /** Makes the pixelated grid tile seamlessly (both axes) before quantization, via the
+   * offset+blend technique — see docs/KNITTING_NOTES.md. */
+  seamless: z.boolean().default(false),
 });
 export type PatternOptions = z.infer<typeof PatternOptionsSchema>;
 
@@ -46,6 +49,9 @@ export const PatternSpecBodySchema = z
     technique: TechniqueSchema,
     gauge: GaugeSpecSchema.optional(),
     grid: GridBodySchema,
+    /** Informational only (the grid already has any seamless blending baked in) — lets the
+     * PDF print a note that the pattern is designed to repeat. */
+    seamless: z.boolean().optional(),
   })
   .refine((spec) => spec.grid.indices.length === spec.grid.width * spec.grid.height, {
     message: 'grid.indices length must equal grid.width * grid.height',

@@ -11,7 +11,7 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
       return reply.code(400).send({ error: 'Invalid pattern spec', details: parsed.error.issues });
     }
 
-    const { technique, gauge, grid: gridJson } = parsed.data;
+    const { technique, gauge, grid: gridJson, seamless } = parsed.data;
     const grid = deserializeGrid(gridJson);
     const pattern = buildPatternResult(technique, grid);
     const yardage = buildYardageEstimate(grid, gauge, pattern);
@@ -24,6 +24,7 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
       widthStitches: grid.width,
       heightRows: grid.height,
       ...(gauge ? { gauge } : {}),
+      ...(seamless !== undefined ? { seamless } : {}),
     });
 
     reply.header('Content-Type', 'application/pdf');

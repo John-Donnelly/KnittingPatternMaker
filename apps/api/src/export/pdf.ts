@@ -343,6 +343,7 @@ export interface PdfPatternInput {
   yardage: YardageEstimate;
   widthStitches: number;
   heightRows: number;
+  seamless?: boolean;
 }
 
 const TECHNIQUE_LABEL: Record<Technique, string> = {
@@ -368,6 +369,13 @@ export async function renderPatternPdf(input: PdfPatternInput): Promise<Uint8Arr
       size: 9.5,
       color: MUTED,
     });
+  }
+
+  if (input.seamless) {
+    writer.paragraph(
+      'This pattern tiles seamlessly: repeat the chart left-to-right and/or top-to-bottom to continue the design.',
+      { size: 9.5, font: writer.boldFont },
+    );
   }
 
   writer.spacer(10);

@@ -14,6 +14,7 @@ function baseForm(overrides: Partial<FormState> = {}): FormState {
     maxColors: 8,
     dither: 'none',
     cropMode: 'auto',
+    seamless: false,
     ...overrides,
   };
 }
@@ -55,5 +56,15 @@ describe('ControlsPanel', () => {
 
     const lastCall = onChange.mock.calls.at(-1)?.[0] as FormState;
     expect(lastCall.widthStitches).toBe(400);
+  });
+
+  it('toggles the seamless tiling checkbox', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<ControlsPanel value={baseForm({ seamless: false })} onChange={onChange} />);
+
+    await user.click(screen.getByLabelText(/Seamless tiling/));
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ seamless: true }));
   });
 });

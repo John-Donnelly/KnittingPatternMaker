@@ -24,9 +24,12 @@ share-link view and the backend's PDF export both call the _same_ `buildPatternR
 end to end, per request:
 
 ```
-sharp decode (EXIF-aware) -> crop -> pixelate -> quantize -> generate pattern
-  -> estimate yardage -> encode share link -> JSON response
+sharp decode (EXIF-aware) -> crop -> pixelate -> [seamless blend, if requested] -> quantize
+  -> generate pattern -> estimate yardage -> encode share link -> JSON response
 ```
+
+The optional seamless-tiling step (`makeSeamless`) runs on the pixelated grid before
+quantization, so the blend band is measured in stitches — see docs/KNITTING_NOTES.md.
 
 sharp is used **only** to decode arbitrary image formats to a raw RGBA buffer (`apps/api/src/pipeline.ts`
 `decodeImage`) — never for resizing or color reduction. That work is 100% `packages/core`, which
