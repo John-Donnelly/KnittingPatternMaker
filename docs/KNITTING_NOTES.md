@@ -120,12 +120,30 @@ as speckle; lowering the max-color count cleans those up.
   Dithering is more reasonable for the knit/purl texture technique, where isolated stitches are
   just fine texturally.
 
-## Seamless tiling
+## Repeat & seamless tiling
 
-Turning on "Seamless tiling" makes the pixelated grid repeatable — you can knit multiple copies
-of the chart side by side and/or stacked, and the join won't show a hard seam. This matters for
-allover colorwork motifs, borders that wrap around a hat/cuff, or blanket squares meant to be
-worked in a grid.
+The tool can take a single **motif** (the `widthStitches` × `heightRows` you specify) and
+actually **repeat (tile)** it into the final chart — `repeat.across` copies wide and
+`repeat.down` copies tall — with an optional **seamless join** so the copies flow into each
+other with no visible seam. This is for allover colorwork, borders that wrap around a
+hat/cuff/blanket, or any design meant to be worked as a repeating unit.
+
+Two independent controls:
+
+- **Repeat across / down** (`tileGrid`, `packages/core/src/image/tileGrid.ts`): how many times
+  the motif is laid down. `1 × 1` is a single motif; `4 × 1` is four copies side by side. The
+  final chart is `motif size × these counts` (capped so it stays within the max grid dimension).
+  Tiling runs on the **quantized** index grid, so every copy is byte-identical — no per-tile
+  quantization drift.
+- **Seamless join** (`none` / `horizontal` / `vertical` / `both`): which of the motif's opposite
+  edges to blend so the repeat loops cleanly. Match it to the direction(s) you're repeating —
+  `horizontal` for a side-by-side border, `both` for an allover repeat. With `none`, the copies
+  are laid down as-is and a hard edge may show at each join.
+
+The row-by-row instructions and PDF are generated from the **already-tiled** chart, so you just
+knit them straight through; each motif width/height simply repeats.
+
+### How the seamless blend works
 
 - Implementation (`packages/core/src/image/seamless.ts`): the two edges of each row (and/or
   column) are blended **across the tile join itself**, leaving the interior of the picture
@@ -146,14 +164,10 @@ worked in a grid.
     anchors. Because the two join-adjacent stitches come purely from the bridge, the residual
     jump at the tile join is **bounded and small for any input** (anchor gap ÷ band width), not
     merely "as continuous as the source happened to be somewhere".
-- Applied to the pixelated grid (post-crop/pixelate, pre-quantize), not the original photo, so
+- Applied to the motif (post-crop/sample, pre-quantize and pre-tile), not the original photo, so
   the blend band is measured in stitches and lines up with what actually ends up in the chart —
   and after quantization to a small palette, the near-matching join stitches usually land in
   the same color bucket, making the tiled edges match exactly.
-- To actually knit a seamless repeat: cast on multiple widths of the chart's stitch count side
-  by side for a horizontal repeat, and/or work the full chart height multiple times in a row for
-  a vertical repeat, continuing the row-by-row instructions exactly as written each time (chart
-  row 1 always starts a new repeat).
 
 ## Determinism
 

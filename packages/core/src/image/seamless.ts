@@ -1,9 +1,17 @@
-import type { RGB } from '../types.js';
+import type { RGB, SeamlessMode } from '../types.js';
 import { labDistanceSq, rgbToLab } from '../color/lab.js';
 
 export interface SeamlessOptions {
   horizontal: boolean;
   vertical: boolean;
+}
+
+/** Maps a user-facing {@link SeamlessMode} to the per-axis blend flags `makeSeamless` uses. */
+export function seamlessModeToOptions(mode: SeamlessMode): SeamlessOptions {
+  return {
+    horizontal: mode === 'horizontal' || mode === 'both',
+    vertical: mode === 'vertical' || mode === 'both',
+  };
 }
 
 /** Below this length there isn't meaningful room to blend; the axis is left unchanged. */

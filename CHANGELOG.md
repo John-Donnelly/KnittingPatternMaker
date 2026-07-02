@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Pattern repetition (tiling)** — the core workflow's missing half. Previously the `seamless`
+  option only _blended a single motif's edges_ so it _could_ tile; it never actually laid down
+  the copies. Now `repeat.across` / `repeat.down` tile the motif into the final chart
+  (`tileGrid`, `packages/core/src/image/tileGrid.ts`): `widthStitches`/`heightRows` size one
+  motif, and the pipeline quantizes that single motif then repeats the **quantized index grid**
+  so every copy is byte-identical (no per-tile drift). The final chart, instructions, yardage,
+  and PDF are all generated from the tiled result. Bounded so `motif × repeat` can't exceed the
+  max grid dimension (zod-validated). Verified end-to-end on the real forest JPEG: a 34×68 tree
+  motif repeated 4× horizontally into a seamless 136×68 forest border.
+
+### Changed
+
+- **Seamless is now directional** (`none` / `horizontal` / `vertical` / `both`) instead of a
+  single both-axes checkbox, so you can blend only the edges you're actually repeating —
+  `horizontal` for a side-by-side border, `both` for an allover repeat (`seamlessModeToOptions`
+  maps the mode to the per-axis blend flags). API: `seamless` changed from `boolean` to the mode
+  enum, and `POST /api/pattern` now accepts `repeat` and echoes back `repeat` + `motif`. UI:
+  the seamless checkbox became a "Repeat & tiling" sub-panel with across/down counts and a
+  seamless-join direction select. 10 new core tests (`tileGrid`, mode mapping) + 2 API
+  integration tests (tiling dimensions/identity, over-limit rejection) + updated web control
+  tests.
+
 - **Dominant-color sampling** — a selectable `sampling` mode (`average` default, or `dominant`)
   that extracts crisp pixel art from a source that isn't clean flat-color art (a photo,
   screenshot, or JPEG of a chart/logo). Where the default box-filter averages every source pixel

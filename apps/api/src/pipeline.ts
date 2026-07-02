@@ -6,10 +6,12 @@ import {
   finishedSize,
   makeSeamless,
   sampleImage,
+  seamlessModeToOptions,
   quantizeGrid,
   quantizeTexture,
   serializeGrid,
   suggestedCropRect,
+  tileGrid,
   type CropRect,
   type Grid,
   type GridJson,
@@ -55,13 +57,20 @@ export interface PipelineResult {
   pattern: PatternResultJson;
   yardage: ReturnType<typeof buildYardageEstimate>;
   shareLink: string;
-  seamless: boolean;
+  seamless: PatternOptions['seamless'];
+  repeat: PatternOptions['repeat'];
+  /** Size of one motif tile before repetition. */
+  motif: { widthStitches: number; heightRows: number };
 }
 
 /**
- * The full deterministic pipeline: crop -> pixelate -> quantize -> generate pattern ->
- * estimate yardage -> encode a shareable link. Given the same image bytes and options, this
- * always returns byte-identical results.
+ * The full deterministic pipeline: crop -> sample -> seamless-blend the motif -> quantize ->
+ * tile (repeat) -> generate pattern -> estimate yardage -> encode a shareable link. Given the
+ * same image bytes and options, this always returns byte-identical results.
+ *
+ * `widthStitches`/`heightRows` size ONE motif tile; `repeat` then tiles it into the final
+ * chart. Seamless blending runs on the motif before quantization (so tile edges match), and
+ * tiling runs on the quantized index grid (so every copy is byte-identical).
  */
 export async function runPipeline(
   imageBuffer: Buffer,
@@ -86,20 +95,22 @@ export async function runPipeline(
     options.heightRows,
     options.sampling,
   );
-  const samples = options.seamless
-    ? makeSeamless(pixelated, options.widthStitches, options.heightRows, {
-        horizontal: true,
-        vertical: true,
-      })
-    : pixelated;
+  const seamlessAxes = seamlessModeToOptions(options.seamless);
+  const samples =
+    seamlessAxes.horizontal || seamlessAxes.vertical
+      ? makeSeamless(pixelated, options.widthStitches, options.heightRows, seamlessAxes)
+      : pixelated;
 
-  const grid: Grid =
+  const motifGrid: Grid =
     options.technique === 'texture'
       ? quantizeTexture(samples, options.widthStitches, options.heightRows, options.dither)
       : quantizeGrid(samples, options.widthStitches, options.heightRows, {
           maxColors: options.maxColors,
           dither: options.dither,
         });
+
+  // Materialize the repeat: tile the quantized motif into the final chart.
+  const grid = tileGrid(motifGrid, options.repeat.across, options.repeat.down);
 
   const pattern = buildPatternResult(options.technique, grid);
   const yardage = buildYardageEstimate(grid, options.gauge, pattern);
@@ -117,10 +128,12 @@ export async function runPipeline(
     yardage,
     shareLink,
     seamless: options.seamless,
+    repeat: options.repeat,
+    motif: { widthStitches: options.widthStitches, heightRows: options.heightRows },
     ...(options.gauge
       ? {
           finishedSize: finishedSize(
-            { widthStitches: options.widthStitches, heightRows: options.heightRows },
+            { widthStitches: grid.width, heightRows: grid.height },
             options.gauge,
           ),
         }

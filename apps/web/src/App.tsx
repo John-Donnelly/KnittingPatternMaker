@@ -8,6 +8,8 @@ import {
   type GaugeSpec,
   type GridJson,
   type PatternResultJson,
+  type RepeatSpec,
+  type SeamlessMode,
   type YardageEstimate,
 } from 'knitting-pattern-core';
 import { ImageUploader } from './components/ImageUploader.js';
@@ -40,7 +42,9 @@ const DEFAULT_FORM: FormState = {
   dither: 'none',
   sampling: 'average',
   cropMode: 'auto',
-  seamless: false,
+  seamless: 'none',
+  repeatAcross: 1,
+  repeatDown: 1,
 };
 
 function formGauge(form: FormState): GaugeSpec | undefined {
@@ -126,6 +130,7 @@ export function App() {
       sampling: debouncedForm.sampling,
       crop,
       seamless: debouncedForm.seamless,
+      repeat: { across: debouncedForm.repeatAcross, down: debouncedForm.repeatDown },
       ...(gauge ? { gauge } : {}),
     };
 
@@ -218,12 +223,13 @@ export function App() {
                   specBody={{
                     technique: form.technique,
                     grid: response.grid,
-                    seamless: response.seamless,
+                    seamless: response.seamless !== 'none',
                     ...(gauge ? { gauge } : {}),
                   }}
                   shareUrl={`${window.location.origin}${window.location.pathname}#p=${response.shareLink}`}
                   finishedSize={response.finishedSize}
                   seamless={response.seamless}
+                  repeat={response.repeat}
                 />
               </>
             )}
@@ -251,7 +257,8 @@ interface ResultViewProps {
   specBody: PatternSpecBody;
   shareUrl: string;
   finishedSize?: { widthIn: number; heightIn: number } | undefined;
-  seamless?: boolean | undefined;
+  seamless?: SeamlessMode | undefined;
+  repeat?: RepeatSpec | undefined;
 }
 
 function ResultView({
@@ -263,19 +270,25 @@ function ResultView({
   shareUrl,
   finishedSize,
   seamless,
+  repeat,
 }: ResultViewProps) {
+  const repeated = repeat && (repeat.across > 1 || repeat.down > 1);
   return (
     <div className="results">
       <ChartView grid={grid} gauge={gauge} />
+      <p className="hint">
+        Chart: {grid.width} stitches × {grid.height} rows
+        {repeated ? ` (motif repeated ${repeat.across} × ${repeat.down})` : ''}
+      </p>
       {finishedSize && (
         <p className="hint">
           Finished size: ~{finishedSize.widthIn.toFixed(1)}in × {finishedSize.heightIn.toFixed(1)}in
         </p>
       )}
-      {seamless && (
+      {seamless && seamless !== 'none' && (
         <p className="hint">
-          This pattern tiles seamlessly — repeat the chart left-right and/or top-bottom to continue
-          the design.
+          Seamless join ({seamless}) — the motif&rsquo;s edges are blended so the repeat loops with
+          no visible seam.
         </p>
       )}
       <LegendList grid={grid} yardage={yardage} />

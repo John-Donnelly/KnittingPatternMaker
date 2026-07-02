@@ -3,6 +3,7 @@ import {
   MAX_GRID_DIMENSION,
   type DitherMode,
   type SamplingMode,
+  type SeamlessMode,
   type Technique,
 } from 'knitting-pattern-core';
 
@@ -17,7 +18,9 @@ export interface FormState {
   dither: DitherMode;
   sampling: SamplingMode;
   cropMode: 'auto' | 'full';
-  seamless: boolean;
+  seamless: SeamlessMode;
+  repeatAcross: number;
+  repeatDown: number;
 }
 
 interface Props {
@@ -178,14 +181,54 @@ export function ControlsPanel({ value, onChange }: Props) {
         </select>
       </label>
 
-      <label className="field field--checkbox">
-        <input
-          type="checkbox"
-          checked={value.seamless}
-          onChange={(e) => set('seamless', e.target.checked)}
-        />
-        <span>Seamless tiling (repeat the pattern left-right and top-bottom with no seam)</span>
-      </label>
+      <fieldset className="subpanel">
+        <legend>Repeat &amp; tiling</legend>
+
+        <div className="field-row">
+          <label className="field">
+            <span>Repeat across</span>
+            <input
+              type="number"
+              min={1}
+              max={MAX_GRID_DIMENSION}
+              value={value.repeatAcross}
+              onChange={(e) => set('repeatAcross', clampInt(e.target.value, 1, MAX_GRID_DIMENSION))}
+            />
+          </label>
+          <label className="field">
+            <span>Repeat down</span>
+            <input
+              type="number"
+              min={1}
+              max={MAX_GRID_DIMENSION}
+              value={value.repeatDown}
+              onChange={(e) => set('repeatDown', clampInt(e.target.value, 1, MAX_GRID_DIMENSION))}
+            />
+          </label>
+        </div>
+        <span className="field__hint">
+          Tiles the motif into the final chart — e.g. 3 × 1 lays the design down three times side by
+          side. Final chart = motif size × these counts.
+        </span>
+
+        <label className="field">
+          <span>Seamless join</span>
+          <select
+            value={value.seamless}
+            aria-describedby="seamless-hint"
+            onChange={(e) => set('seamless', e.target.value as SeamlessMode)}
+          >
+            <option value="none">None (repeats may show a seam at each join)</option>
+            <option value="horizontal">Horizontal (blend left/right edges)</option>
+            <option value="vertical">Vertical (blend top/bottom edges)</option>
+            <option value="both">Both directions</option>
+          </select>
+        </label>
+        <span id="seamless-hint" className="field__hint">
+          Blends the motif&rsquo;s opposite edges so the repeat loops with no visible seam. Match
+          this to the direction(s) you&rsquo;re repeating.
+        </span>
+      </fieldset>
     </fieldset>
   );
 }

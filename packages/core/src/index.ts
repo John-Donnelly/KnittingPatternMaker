@@ -13,8 +13,9 @@ export { pixelateDominant } from './image/dominantSample.js';
 export { sampleImage } from './image/sample.js';
 export { ditherBayer4, ditherFloydSteinberg } from './image/dither.js';
 export { quantizeGrid } from './image/quantizeGrid.js';
-export { makeSeamless } from './image/seamless.js';
+export { makeSeamless, seamlessModeToOptions } from './image/seamless.js';
 export type { SeamlessOptions } from './image/seamless.js';
+export { tileGrid } from './image/tileGrid.js';
 export {
   DEFAULT_GAUGE,
   stitchAspectRatio,

@@ -5,7 +5,9 @@ import type {
   GaugeSpec,
   GridJson,
   PatternResultJson,
+  RepeatSpec,
   SamplingMode,
+  SeamlessMode,
   Technique,
   YardageEstimate,
 } from 'knitting-pattern-core';
@@ -19,7 +21,8 @@ export interface PatternOptions {
   dither: DitherMode;
   sampling: SamplingMode;
   crop?: CropRect;
-  seamless: boolean;
+  seamless: SeamlessMode;
+  repeat: RepeatSpec;
 }
 
 export interface PatternResponse {
@@ -30,7 +33,9 @@ export interface PatternResponse {
   pattern: PatternResultJson;
   yardage: YardageEstimate;
   shareLink: string;
-  seamless: boolean;
+  seamless: SeamlessMode;
+  repeat: RepeatSpec;
+  motif: { widthStitches: number; heightRows: number };
 }
 
 export interface PatternSpecBody {

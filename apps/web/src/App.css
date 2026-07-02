@@ -100,6 +100,19 @@ body {
   padding: 0 4px;
 }
 
+.subpanel {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px 4px;
+  margin-top: 4px;
+}
+
+.subpanel legend {
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0 4px;
+}
+
 .panel h3 {
   margin: 0 0 8px;
   font-size: 1rem;

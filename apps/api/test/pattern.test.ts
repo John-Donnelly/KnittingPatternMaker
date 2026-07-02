@@ -105,20 +105,75 @@ describe('POST /api/pattern', () => {
 
     const withoutSeamless = await request(app.server)
       .post('/api/pattern')
-      .field('options', JSON.stringify({ ...baseOptions, seamless: false }))
+      .field('options', JSON.stringify({ ...baseOptions, seamless: 'none' }))
       .attach('image', image, 'ramp.png');
     const withSeamless = await request(app.server)
       .post('/api/pattern')
-      .field('options', JSON.stringify({ ...baseOptions, seamless: true }))
+      .field('options', JSON.stringify({ ...baseOptions, seamless: 'both' }))
       .attach('image', image, 'ramp.png');
 
     expect(withoutSeamless.status).toBe(200);
     expect(withSeamless.status).toBe(200);
-    expect(withoutSeamless.body.seamless).toBe(false);
-    expect(withSeamless.body.seamless).toBe(true);
+    expect(withoutSeamless.body.seamless).toBe('none');
+    expect(withSeamless.body.seamless).toBe('both');
     // Seamless blending alters the pixel data before quantization, so the resulting grid
     // should differ from the non-seamless run on this hard-wrap-edge test image.
     expect(withSeamless.body.grid).not.toEqual(withoutSeamless.body.grid);
+  });
+
+  it('repeats (tiles) the motif into a larger chart and echoes the repeat/motif info', async () => {
+    const image = await makeTestImagePng(40, 20);
+    const motif = { widthStitches: 10, heightRows: 6 };
+    const single = await request(app.server)
+      .post('/api/pattern')
+      .field('options', JSON.stringify({ technique: 'intarsia', ...motif, maxColors: 2 }))
+      .attach('image', image, 'test.png');
+    const tiled = await request(app.server)
+      .post('/api/pattern')
+      .field(
+        'options',
+        JSON.stringify({
+          technique: 'intarsia',
+          ...motif,
+          maxColors: 2,
+          repeat: { across: 3, down: 2 },
+        }),
+      )
+      .attach('image', image, 'test.png');
+
+    expect(single.status).toBe(200);
+    expect(tiled.status).toBe(200);
+    // Final chart is motif size * repeat counts.
+    expect(tiled.body.grid.width).toBe(30);
+    expect(tiled.body.grid.height).toBe(12);
+    expect(tiled.body.repeat).toEqual({ across: 3, down: 2 });
+    expect(tiled.body.motif).toEqual(motif);
+
+    // Every tile is byte-identical to the single motif: cell (x,y) == cell (x%10, y%6).
+    const single1 = single.body.grid.indices as number[];
+    const tiledIdx = tiled.body.grid.indices as number[];
+    for (let y = 0; y < 12; y++) {
+      for (let x = 0; x < 30; x++) {
+        expect(tiledIdx[y * 30 + x]).toBe(single1[(y % 6) * 10 + (x % 10)]);
+      }
+    }
+  });
+
+  it('rejects a repeat that would exceed the max grid dimension', async () => {
+    const image = await makeTestImagePng(20, 20);
+    const res = await request(app.server)
+      .post('/api/pattern')
+      .field(
+        'options',
+        JSON.stringify({
+          technique: 'intarsia',
+          widthStitches: 200,
+          heightRows: 10,
+          repeat: { across: 3, down: 1 }, // 200*3 = 600 > 400
+        }),
+      )
+      .attach('image', image, 'test.png');
+    expect(res.status).toBe(400);
   });
 
   it('dominant sampling recovers flat chart colors that averaging muddies with gridlines', async () => {
@@ -144,7 +199,7 @@ describe('POST /api/pattern', () => {
 
     expect(avg.status).toBe(200);
     expect(dom.status).toBe(200);
-    expect(dom.body.seamless).toBe(false);
+    expect(dom.body.seamless).toBe('none');
 
     type C = { r: number; g: number; b: number };
     const has = (palette: C[], t: C) =>
@@ -191,7 +246,7 @@ describe('POST /api/pattern', () => {
       widthStitches: 12,
       heightRows: 12,
       dither: 'none',
-      seamless: true,
+      seamless: 'both',
     };
 
     const first = await request(app.server)

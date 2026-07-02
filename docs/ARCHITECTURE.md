@@ -24,15 +24,17 @@ share-link view and the backend's PDF export both call the _same_ `buildPatternR
 end to end, per request:
 
 ```
-sharp decode (EXIF-aware) -> crop -> sample (average | dominant)
-  -> [seamless blend, if requested] -> quantize
-  -> generate pattern -> estimate yardage -> encode share link -> JSON response
+sharp decode (EXIF-aware) -> crop -> sample (average | dominant) -> [seamless blend]
+  -> quantize (one motif) -> tile (repeat across/down) -> generate pattern
+  -> estimate yardage -> encode share link -> JSON response
 ```
 
-The `sample` step (`sampleImage`) turns each stitch cell's source pixels into one color, either
-by averaging or by picking the cell's dominant color to reject grid lines / JPEG noise; the
-optional seamless-tiling step (`makeSeamless`) then runs on that sampled grid before
-quantization, so both are measured in stitches — see docs/KNITTING_NOTES.md.
+`widthStitches`/`heightRows` size ONE motif tile. The `sample` step (`sampleImage`) turns each
+cell's source pixels into one color (averaging, or the cell's dominant color to reject grid
+lines / JPEG noise); `makeSeamless` optionally blends the motif's chosen edges; quantization
+runs on the single motif; then `tileGrid` materializes the repeat by laying the quantized motif
+down `repeat.across × repeat.down` times. Seamless blending is measured in stitches and tiling
+reuses the quantized indices, so every copy is byte-identical — see docs/KNITTING_NOTES.md.
 
 sharp is used **only** to decode arbitrary image formats to a raw RGBA buffer (`apps/api/src/pipeline.ts`
 `decodeImage`) — never for resizing or color reduction. That work is 100% `packages/core`, which

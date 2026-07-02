@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ControlsPanel, type FormState } from '../src/components/ControlsPanel.js';
 
@@ -15,7 +15,9 @@ function baseForm(overrides: Partial<FormState> = {}): FormState {
     dither: 'none',
     sampling: 'average',
     cropMode: 'auto',
-    seamless: false,
+    seamless: 'none',
+    repeatAcross: 1,
+    repeatDown: 1,
     ...overrides,
   };
 }
@@ -59,14 +61,23 @@ describe('ControlsPanel', () => {
     expect(lastCall.widthStitches).toBe(400);
   });
 
-  it('toggles the seamless tiling checkbox', async () => {
+  it('changes the seamless join direction via the select', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    render(<ControlsPanel value={baseForm({ seamless: false })} onChange={onChange} />);
+    render(<ControlsPanel value={baseForm({ seamless: 'none' })} onChange={onChange} />);
 
-    await user.click(screen.getByLabelText(/Seamless tiling/));
+    await user.selectOptions(screen.getByLabelText('Seamless join'), 'horizontal');
 
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ seamless: true }));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ seamless: 'horizontal' }));
+  });
+
+  it('updates the repeat-across count', () => {
+    const onChange = vi.fn();
+    render(<ControlsPanel value={baseForm({ repeatAcross: 1 })} onChange={onChange} />);
+
+    fireEvent.change(screen.getByLabelText('Repeat across'), { target: { value: '3' } });
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ repeatAcross: 3 }));
   });
 
   it('changes the sampling mode via the select', async () => {

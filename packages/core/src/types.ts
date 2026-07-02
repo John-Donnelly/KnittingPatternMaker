@@ -40,6 +40,15 @@ export type DitherMode = 'none' | 'bayer4' | 'floyd-steinberg';
  */
 export type SamplingMode = 'average' | 'dominant';
 
+/** Which axes to make tileable so a repeated motif loops with no visible seam. */
+export type SeamlessMode = 'none' | 'horizontal' | 'vertical' | 'both';
+
+/** How many times to repeat (tile) the motif into the final chart. 1x1 = a single motif. */
+export interface RepeatSpec {
+  across: number;
+  down: number;
+}
+
 export interface QuantizeOptions {
   /** Maximum number of distinct colors in the resulting palette (>= 1). */
   maxColors: number;
