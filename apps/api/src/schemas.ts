@@ -53,11 +53,11 @@ export const PatternOptionsSchema = z
     repeat: RepeatSpecSchema.default({ across: 1, down: 1 }),
   })
   .refine((o) => o.widthStitches * o.repeat.across <= MAX_GRID_DIMENSION, {
-    message: `widthStitches * repeat.across must not exceed ${MAX_GRID_DIMENSION}`,
+    message: `Final width (motif width × repeat across) exceeds the ${MAX_GRID_DIMENSION}-stitch limit — reduce the width or the repeat-across count.`,
     path: ['repeat', 'across'],
   })
   .refine((o) => o.heightRows * o.repeat.down <= MAX_GRID_DIMENSION, {
-    message: `heightRows * repeat.down must not exceed ${MAX_GRID_DIMENSION}`,
+    message: `Final height (motif height × repeat down) exceeds the ${MAX_GRID_DIMENSION}-row limit — reduce the height or the repeat-down count.`,
     path: ['repeat', 'down'],
   });
 export type PatternOptions = z.infer<typeof PatternOptionsSchema>;

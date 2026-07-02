@@ -210,6 +210,19 @@ export function ControlsPanel({ value, onChange }: Props) {
           Tiles the motif into the final chart — e.g. 3 × 1 lays the design down three times side by
           side. Final chart = motif size × these counts.
         </span>
+        {(() => {
+          const finalW = value.widthStitches * value.repeatAcross;
+          const finalH = value.heightRows * value.repeatDown;
+          const over = finalW > MAX_GRID_DIMENSION || finalH > MAX_GRID_DIMENSION;
+          return (
+            <span className={over ? 'error' : 'field__hint'}>
+              Final chart: {finalW} × {finalH} stitches
+              {over
+                ? ` — over the ${MAX_GRID_DIMENSION} limit. Reduce the motif size or repeat counts.`
+                : ''}
+            </span>
+          );
+        })()}
 
         <label className="field">
           <span>Seamless join</span>

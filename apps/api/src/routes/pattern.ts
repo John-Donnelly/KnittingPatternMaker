@@ -31,7 +31,11 @@ export async function registerPatternRoute(app: FastifyInstance): Promise<void> 
 
     const parsed = PatternOptionsSchema.safeParse(optionsJson);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'Invalid options', details: parsed.error.issues });
+      // Surface the first issue's message (e.g. the width*repeat over-limit) so the UI can show
+      // something actionable instead of a bare "Invalid options".
+      const first = parsed.error.issues[0];
+      const message = first ? first.message : 'Invalid options';
+      return reply.code(400).send({ error: message, details: parsed.error.issues });
     }
 
     try {

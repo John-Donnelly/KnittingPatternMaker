@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Repeat appeared "not to work" when `motif width × repeat` exceeded the 400-stitch grid
+  limit.** The request failed validation, but `POST /api/pattern` returned a bare
+  `"Invalid options"` and the frontend kept showing the last good chart — so changing "Repeat
+  across" to 4 (with a 136-wide motif = 544) silently did nothing. Now: the zod refine messages
+  are human-readable ("Final width (motif width × repeat across) exceeds the 400-stitch limit —
+  reduce the width or the repeat-across count"), the route surfaces the first validation issue's
+  message instead of a generic string, and the "Repeat & tiling" panel shows a **live final-size
+  readout** ("Final chart: 544 × 40 stitches — over the 400 limit") in red before any request
+  fires. Verified in the browser: within the limit, repeat tiles correctly (40 × repeat 4 →
+  160-stitch chart); over the limit, the user now gets an immediate, specific explanation.
+
 ### Added
 
 - **Pattern repetition (tiling)** — the core workflow's missing half. Previously the `seamless`

@@ -174,6 +174,8 @@ describe('POST /api/pattern', () => {
       )
       .attach('image', image, 'test.png');
     expect(res.status).toBe(400);
+    // The error must be specific and actionable, not a bare "Invalid options".
+    expect(res.body.error).toMatch(/final width.*repeat across.*limit/i);
   });
 
   it('dominant sampling recovers flat chart colors that averaging muddies with gridlines', async () => {
