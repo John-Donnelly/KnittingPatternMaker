@@ -2,7 +2,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { FastifyInstance } from 'fastify';
 import { buildServer } from '../src/server.js';
-import { makeGriddedChartPng, makeRampImagePng, makeTestImagePng } from './helpers.js';
+import {
+  makeColorBandsPng,
+  makeGriddedChartPng,
+  makeRampImagePng,
+  makeTestImagePng,
+} from './helpers.js';
 
 describe('POST /api/pattern', () => {
   let app: FastifyInstance;
@@ -124,9 +129,14 @@ describe('POST /api/pattern', () => {
   it('repeats (tiles) the motif into a larger chart and echoes the repeat/motif info', async () => {
     const image = await makeTestImagePng(40, 20);
     const motif = { widthStitches: 10, heightRows: 6 };
+    // seamless is pinned to 'none' because this test asserts byte-identical tiles; when a
+    // repeat is requested with seamless unset, auto mode blends the joins instead.
     const single = await request(app.server)
       .post('/api/pattern')
-      .field('options', JSON.stringify({ technique: 'intarsia', ...motif, maxColors: 2 }))
+      .field(
+        'options',
+        JSON.stringify({ technique: 'intarsia', ...motif, maxColors: 2, seamless: 'none' }),
+      )
       .attach('image', image, 'test.png');
     const tiled = await request(app.server)
       .post('/api/pattern')
@@ -136,6 +146,7 @@ describe('POST /api/pattern', () => {
           technique: 'intarsia',
           ...motif,
           maxColors: 2,
+          seamless: 'none',
           repeat: { across: 3, down: 2 },
         }),
       )
@@ -262,6 +273,65 @@ describe('POST /api/pattern', () => {
 
     expect(first.body.grid).toEqual(second.body.grid);
     expect(first.body.shareLink).toBe(second.body.shareLink);
+  });
+
+  it('generates a complete pattern from an image with NO options at all (auto mode)', async () => {
+    const image = await makeColorBandsPng(200, 200);
+    const res = await request(app.server).post('/api/pattern').attach('image', image, 'art.png');
+
+    expect(res.status).toBe(200);
+    // Every option was resolved to something concrete and reported back.
+    const resolved = res.body.resolvedOptions;
+    expect(resolved.technique).toBeDefined();
+    expect(resolved.widthStitches).toBeGreaterThan(0);
+    expect(resolved.heightRows).toBeGreaterThan(0);
+    expect(resolved.maxColors).toBeGreaterThanOrEqual(2);
+    expect(resolved.sampling).toBeDefined();
+    expect(resolved.dither).toBeDefined();
+    expect(res.body.grid.width).toBe(resolved.widthStitches * resolved.repeat.across);
+    expect(res.body.grid.height).toBe(resolved.heightRows * resolved.repeat.down);
+    expect(res.body.pattern.technique).toBe(resolved.technique);
+    // Every auto choice comes with a human-readable reason.
+    expect(res.body.autoDecisions.length).toBeGreaterThan(0);
+    for (const d of res.body.autoDecisions) {
+      expect(typeof d.field).toBe('string');
+      expect(d.reason.length).toBeGreaterThan(10);
+    }
+    // Flat color bands: auto should pick dominant sampling and intarsia (4 blocks per row).
+    expect(resolved.sampling).toBe('dominant');
+    expect(resolved.technique).toBe('intarsia');
+  });
+
+  it('auto mode is deterministic across identical requests', async () => {
+    const image = await makeColorBandsPng(120, 90);
+    const first = await request(app.server)
+      .post('/api/pattern')
+      .field('options', '{}')
+      .attach('image', image, 'art.png');
+    const second = await request(app.server)
+      .post('/api/pattern')
+      .field('options', '{}')
+      .attach('image', image, 'art.png');
+    expect(first.status).toBe(200);
+    expect(first.body.grid).toEqual(second.body.grid);
+    expect(first.body.resolvedOptions).toEqual(second.body.resolvedOptions);
+    expect(first.body.shareLink).toBe(second.body.shareLink);
+  });
+
+  it('auto mode fills only the fields the request left unset', async () => {
+    const image = await makeColorBandsPng(120, 90);
+    const res = await request(app.server)
+      .post('/api/pattern')
+      .field('options', JSON.stringify({ technique: 'stranded', maxColors: 3 }))
+      .attach('image', image, 'art.png');
+
+    expect(res.status).toBe(200);
+    expect(res.body.resolvedOptions.technique).toBe('stranded');
+    expect(res.body.resolvedOptions.maxColors).toBe(3);
+    expect(res.body.grid.palette.length).toBeLessThanOrEqual(3);
+    const decidedFields = (res.body.autoDecisions as { field: string }[]).map((d) => d.field);
+    expect(decidedFields).not.toContain('technique');
+    expect(decidedFields).not.toContain('maxColors');
   });
 
   it('rejects missing image', async () => {

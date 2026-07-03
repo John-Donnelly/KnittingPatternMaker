@@ -52,6 +52,32 @@ export async function makeGriddedChartPng(
     .toBuffer();
 }
 
+/** Four flat vertical color bands — colorful flat art whose rows each hold 4 color blocks,
+ * the shape auto mode should recognize as intarsia-friendly. */
+export async function makeColorBandsPng(width: number, height: number): Promise<Buffer> {
+  const BANDS: [number, number, number][] = [
+    [200, 30, 30],
+    [30, 60, 200],
+    [30, 160, 60],
+    [245, 245, 245],
+  ];
+  const data = Buffer.alloc(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const band = Math.min(BANDS.length - 1, Math.floor((x / width) * BANDS.length));
+      const [r, g, b] = BANDS[band] ?? [0, 0, 0];
+      const i = (y * width + x) * 4;
+      data[i] = r;
+      data[i + 1] = g;
+      data[i + 2] = b;
+      data[i + 3] = 255;
+    }
+  }
+  return sharp(data, { raw: { width, height, channels: 4 } })
+    .png()
+    .toBuffer();
+}
+
 /** A horizontal grayscale ramp: smooth everywhere except a hard jump at the wrap-around edge
  * (right edge back to left edge) — useful for testing seamless tiling actually helps. */
 export async function makeRampImagePng(width: number, height: number): Promise<Buffer> {

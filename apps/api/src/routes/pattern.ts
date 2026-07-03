@@ -18,13 +18,11 @@ export async function registerPatternRoute(app: FastifyInstance): Promise<void> 
     if (!imageBuffer) {
       return reply.code(400).send({ error: 'Missing "image" file field' });
     }
-    if (!optionsRaw) {
-      return reply.code(400).send({ error: 'Missing "options" field' });
-    }
-
     let optionsJson: unknown;
     try {
-      optionsJson = JSON.parse(optionsRaw);
+      // Options are entirely optional: an omitted field (or none at all) means "let auto
+      // mode choose from the image". The response reports what was chosen and why.
+      optionsJson = optionsRaw === undefined ? {} : JSON.parse(optionsRaw);
     } catch {
       return reply.code(400).send({ error: 'Invalid JSON in "options" field' });
     }

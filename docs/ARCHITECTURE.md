@@ -20,14 +20,24 @@ share-link view and the backend's PDF export both call the _same_ `buildPatternR
 
 ## Request flow
 
-`POST /api/pattern` (multipart: an image file + a JSON `options` field) runs one pipeline,
-end to end, per request:
+`POST /api/pattern` (multipart: an image file + an optional JSON `options` field) runs one
+pipeline, end to end, per request:
 
 ```
-sharp decode (EXIF-aware) -> crop -> sample (average | dominant) -> [seamless blend]
+sharp decode (EXIF-aware) -> resolve unset options from the image (auto mode)
+  -> crop -> sample (average | dominant) -> [seamless blend]
   -> quantize (one motif) -> tile (repeat across/down) -> generate pattern
   -> estimate yardage -> encode share link -> JSON response
 ```
+
+**Every option is optional** — `{}` (or omitting `options` entirely) is a valid request.
+`resolveAutoOptions` (`packages/core/src/auto/`) fills each unset field deterministically from
+the decoded image: probe-grid stats (flat-art vs photo, significant colors, chroma) drive
+sampling/dithering/size, and technique is chosen by quantizing a candidate grid and measuring
+per-row color counts and blocks against standard stranded/intarsia practice (thresholds and
+sources in `docs/KNITTING_NOTES.md`, "Auto mode"). The response carries `resolvedOptions` (the
+concrete settings used) and `autoDecisions` (each auto-chosen field, its value, and a
+human-readable reason — the UI shows these in Auto settings mode).
 
 `widthStitches`/`heightRows` size ONE motif tile. The `sample` step (`sampleImage`) turns each
 cell's source pixels into one color (averaging, or the cell's dominant color to reject grid

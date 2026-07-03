@@ -24,6 +24,25 @@ export {
 } from './image/gauge.js';
 export type { FinishedSize } from './image/gauge.js';
 
+export { analyzeImage } from './auto/imageStats.js';
+export type { ImageStats } from './auto/imageStats.js';
+export {
+  resolveAutoOptions,
+  AUTO_TARGET_FINISHED_WIDTH_IN,
+  AUTO_MIN_DIMENSION,
+  AUTO_NATIVE_PIXEL_ART_MAX,
+  AUTO_STRANDED_MAX_PALETTE,
+  AUTO_INTARSIA_MAX_PALETTE,
+  AUTO_STRANDED_MAX_BUSY_ROW_FRACTION,
+  AUTO_INTARSIA_MAX_YARN_ENDS_PER_ROW,
+} from './auto/autoSettings.js';
+export type {
+  AutoPatternRequest,
+  ResolvedPatternOptions,
+  AutoDecision,
+  AutoResolution,
+} from './auto/autoSettings.js';
+
 export { chartRowToGridRow, isRightSideRow, toKnittingOrder } from './pattern/chartOrder.js';
 export { runLengthEncode } from './pattern/runLength.js';
 export type { Run } from './pattern/runLength.js';

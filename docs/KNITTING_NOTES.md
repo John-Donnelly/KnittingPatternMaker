@@ -169,6 +169,46 @@ knit them straight through; each motif width/height simply repeats.
   and after quantization to a small palette, the near-matching join stitches usually land in
   the same color bucket, making the tiled edges match exactly.
 
+## Auto mode
+
+Every pattern option is optional; anything unset is chosen from the image by
+`resolveAutoOptions` (`packages/core/src/auto/`). The choices are deterministic heuristics —
+no ML, no randomness — validated against the _actual_ quantized stitch grid using the same
+pure functions the final pattern is built from, and each choice is reported back with a
+human-readable reason. The defaults encode published colorwork conventions:
+
+- **Technique.** Traditional Fair Isle is worked with **at most 2 colors per row** and a
+  **4–5 color total palette** ([Wikipedia: Fair Isle](<https://en.wikipedia.org/wiki/Fair_Isle_(technique)>),
+  [Knit Picks Fair Isle guide](https://www.knitpicks.com/learning-center/fair-isle-knitting-guide));
+  intarsia suits **large solid color blocks** and gets impractical past roughly **10
+  simultaneous bobbins** ([Nimble Needles: intarsia tips](https://nimble-needles.com/tutorials/advanced-intarsia-knitting-10-tips/),
+  [intarsia vs Fair Isle](https://nimble-needles.com/tutorials/intarsia-knitting-vs-fair-isle/)).
+  Auto mode therefore quantizes a candidate grid and measures it: if ≥ 75% of rows use ≤ 2
+  colors it picks **stranded** (palette capped at 5); otherwise, if no row needs more than 10
+  color blocks, it picks **intarsia** (palette capped at 10); busier, photo-like content falls
+  back to stranded with a small palette (floats degrade better than hundreds of bobbins, and
+  over-2-color rows are flagged). Near-grayscale images (mean Lab chroma < 6) map to
+  **knit/purl texture** instead.
+- **Size.** Popular chart tools default to ~48–100-stitch widths (knitPro's "Regular" grid is
+  48×64, [microrevolt.org/knitPro](https://www.microrevolt.org/knitPro/); Stitchboard caps free
+  charts at 100). Auto mode targets a **~10 in finished width at the working gauge** (55
+  stitches at the default 22 sts/4 in), with rows derived from the image's aspect ratio
+  corrected for non-square stitches. Small flat-color sources (≤ 120 px per side) are instead
+  mapped **1 stitch per pixel**, so existing pixel art comes through exactly.
+- **Sampling.** Flat-color art (few significant colors, hardly any soft pixel-to-pixel
+  transitions on a probe grid) gets **dominant** sampling; photographic content gets
+  **average**. See "Sampling" above.
+- **Dithering.** Off for colorwork — dithered speckle is impractical to knit as color regions
+  ([OddKnit on chart design](http://www.oddknit.com/design/colour/chartdesign.html), and see
+  "Color quantization" above). For texture charts of tonally rich sources (photos/gradients),
+  Floyd–Steinberg is used so shading survives the 2-tone reduction as relief.
+- **Seamless & repeat.** If a repeat is requested without an explicit seamless mode, the joined
+  edges are blended in the repeat direction(s) — a visible seam on a deliberate repeat is
+  almost never wanted. Pass `seamless: "none"` to keep hard joins.
+
+The full request/response contract (`resolvedOptions`, `autoDecisions`) is described in
+`docs/ARCHITECTURE.md`.
+
 ## Determinism
 
 Every stage above — pixelation, quantization, dithering, pattern generation, yardage estimation,

@@ -5,6 +5,7 @@ import {
   encodePatternSpec,
   finishedSize,
   makeSeamless,
+  resolveAutoOptions,
   sampleImage,
   seamlessModeToOptions,
   quantizeGrid,
@@ -12,11 +13,13 @@ import {
   serializeGrid,
   suggestedCropRect,
   tileGrid,
+  type AutoDecision,
   type CropRect,
   type Grid,
   type GridJson,
   type PatternResultJson,
   type PixelBuffer,
+  type ResolvedPatternOptions,
 } from 'knitting-pattern-core';
 import type { PatternOptions } from './schemas.js';
 
@@ -57,16 +60,21 @@ export interface PipelineResult {
   pattern: PatternResultJson;
   yardage: ReturnType<typeof buildYardageEstimate>;
   shareLink: string;
-  seamless: PatternOptions['seamless'];
-  repeat: PatternOptions['repeat'];
+  seamless: ResolvedPatternOptions['seamless'];
+  repeat: ResolvedPatternOptions['repeat'];
   /** Size of one motif tile before repetition. */
   motif: { widthStitches: number; heightRows: number };
+  /** The concrete options this pattern was generated with (user's + auto-chosen). */
+  resolvedOptions: ResolvedPatternOptions;
+  /** Choices auto mode made for fields the request left unset, with reasons. */
+  autoDecisions: AutoDecision[];
 }
 
 /**
- * The full deterministic pipeline: crop -> sample -> seamless-blend the motif -> quantize ->
- * tile (repeat) -> generate pattern -> estimate yardage -> encode a shareable link. Given the
- * same image bytes and options, this always returns byte-identical results.
+ * The full deterministic pipeline: decode -> resolve unset options from the image (auto
+ * mode) -> crop -> sample -> seamless-blend the motif -> quantize -> tile (repeat) ->
+ * generate pattern -> estimate yardage -> encode a shareable link. Given the same image
+ * bytes and options, this always returns byte-identical results.
  *
  * `widthStitches`/`heightRows` size ONE motif tile; `repeat` then tiles it into the final
  * chart. Seamless blending runs on the motif before quantization (so tile edges match), and
@@ -74,9 +82,11 @@ export interface PipelineResult {
  */
 export async function runPipeline(
   imageBuffer: Buffer,
-  options: PatternOptions,
+  requested: PatternOptions,
 ): Promise<PipelineResult> {
   const source = await decodeImage(imageBuffer);
+
+  const { options, decisions } = resolveAutoOptions(source, requested);
 
   const crop: CropRect =
     options.crop ??
@@ -130,6 +140,8 @@ export async function runPipeline(
     seamless: options.seamless,
     repeat: options.repeat,
     motif: { widthStitches: options.widthStitches, heightRows: options.heightRows },
+    resolvedOptions: options,
+    autoDecisions: decisions,
     ...(options.gauge
       ? {
           finishedSize: finishedSize(

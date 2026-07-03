@@ -34,32 +34,45 @@ export const RgbSchema = z.object({
   b: z.number().int().min(0).max(255),
 });
 
+/**
+ * Every field is optional: anything unset is chosen by auto mode from the image itself
+ * (`resolveAutoOptions` in packages/core) and reported back in `resolvedOptions` /
+ * `autoDecisions`. `{}` is a fully valid request.
+ */
 export const PatternOptionsSchema = z
   .object({
-    technique: TechniqueSchema,
+    technique: TechniqueSchema.optional(),
     /** Size of ONE motif tile (before any repetition). */
-    widthStitches: z.number().int().min(1).max(MAX_GRID_DIMENSION),
-    heightRows: z.number().int().min(1).max(MAX_GRID_DIMENSION),
+    widthStitches: z.number().int().min(1).max(MAX_GRID_DIMENSION).optional(),
+    heightRows: z.number().int().min(1).max(MAX_GRID_DIMENSION).optional(),
     gauge: GaugeSpecSchema.optional(),
-    maxColors: z.number().int().min(1).max(MAX_COLORS).default(8),
-    dither: DitherModeSchema.default('none'),
+    maxColors: z.number().int().min(1).max(MAX_COLORS).optional(),
+    dither: DitherModeSchema.optional(),
     /** How each cell samples the source pixels it covers — `dominant` extracts crisp pixel art
      * from a photo/JPEG of a chart by rejecting outlier pixels; see docs/KNITTING_NOTES.md. */
-    sampling: SamplingModeSchema.default('average'),
+    sampling: SamplingModeSchema.optional(),
     crop: CropRectSchema.optional(),
     /** Which axes to blend so a repeated motif loops with no visible seam. */
-    seamless: SeamlessModeSchema.default('none'),
+    seamless: SeamlessModeSchema.optional(),
     /** How many times to tile the motif into the final chart (1x1 = a single motif). */
-    repeat: RepeatSpecSchema.default({ across: 1, down: 1 }),
+    repeat: RepeatSpecSchema.optional(),
   })
-  .refine((o) => o.widthStitches * o.repeat.across <= MAX_GRID_DIMENSION, {
-    message: `Final width (motif width × repeat across) exceeds the ${MAX_GRID_DIMENSION}-stitch limit — reduce the width or the repeat-across count.`,
-    path: ['repeat', 'across'],
-  })
-  .refine((o) => o.heightRows * o.repeat.down <= MAX_GRID_DIMENSION, {
-    message: `Final height (motif height × repeat down) exceeds the ${MAX_GRID_DIMENSION}-row limit — reduce the height or the repeat-down count.`,
-    path: ['repeat', 'down'],
-  });
+  .refine(
+    (o) =>
+      o.widthStitches === undefined ||
+      o.widthStitches * (o.repeat?.across ?? 1) <= MAX_GRID_DIMENSION,
+    {
+      message: `Final width (motif width × repeat across) exceeds the ${MAX_GRID_DIMENSION}-stitch limit — reduce the width or the repeat-across count.`,
+      path: ['repeat', 'across'],
+    },
+  )
+  .refine(
+    (o) => o.heightRows === undefined || o.heightRows * (o.repeat?.down ?? 1) <= MAX_GRID_DIMENSION,
+    {
+      message: `Final height (motif height × repeat down) exceeds the ${MAX_GRID_DIMENSION}-row limit — reduce the height or the repeat-down count.`,
+      path: ['repeat', 'down'],
+    },
+  );
 export type PatternOptions = z.infer<typeof PatternOptionsSchema>;
 
 export const GridBodySchema = z.object({
