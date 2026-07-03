@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Landing page** at `/` (hero, feature overview, how-it-works) with the pattern maker moved
+  to `/app` (tiny history-API router — share links keep working from any path). The header
+  shows sign-in/sign-out state when SSO is configured.
+- **Single sign-on (OIDC)** — `GET /api/auth/login` / `GET /api/auth/callback` /
+  `POST /api/auth/logout` / `GET /api/auth/me`, implemented as a small, auditable
+  authorization-code + PKCE flow against any standards-compliant provider (Google, Microsoft
+  Entra, Okta, Auth0, Keycloak, ...) configured via `OIDC_ISSUER`/`OIDC_CLIENT_ID`/
+  `OIDC_CLIENT_SECRET`. Sessions are stateless HMAC-signed httpOnly cookies (7-day expiry,
+  `Secure` in production); no token ever reaches the browser. `AUTH_REQUIRED=true` gates
+  pattern generation/export behind sign-in; with SSO unconfigured everything stays anonymous
+  and dev needs zero auth setup. 8 integration tests (state mismatch, full round trip against
+  a mocked provider, gating on/off).
+- **Production readiness**: validated env-driven config (`src/config.ts`, fails fast on a
+  missing `SESSION_SECRET` or half-configured auth in production), helmet security headers
+  with a CSP, per-IP rate limiting on `/api` (`RATE_LIMIT_MAX`/min), cookie/authorization
+  header redaction in logs, graceful SIGINT/SIGTERM shutdown, `/api/health`, and single-
+  deployable static serving of the built frontend with an SPA fallback (`STATIC_ROOT`).
+  Multi-stage `Dockerfile` (non-root, healthcheck) + `docker-compose.yml` + `.env.example`,
+  documented in the README's new Deployment section.
+
+- **Auto mode: every pattern option is now optional, and anything unset is chosen from the
+  image itself.** `POST /api/pattern` accepts a partial (or entirely empty/omitted) `options`
+  field; `resolveAutoOptions` (`packages/core/src/auto/`) analyzes the decoded image on a probe
+  grid (flat-art vs photo, significant-color count, tonal richness, chroma) and fills in every
+  unset field, validating technique choice against the _actual_ quantized stitch grid (per-row
+  color counts, color blocks per row) — deterministic heuristics, no ML, so auto mode is exactly
+  as reproducible and unit-testable as the rest of the pipeline. Choices conform to sourced
+  colorwork conventions (see the new "Auto mode" section in `docs/KNITTING_NOTES.md`): stranded
+  when rows stay ≤ 2 colors (Fair Isle practice) with a ≤ 5-color palette, intarsia when rows
+  need more colors but stay ≤ 10 blocks wide (bobbin practicality), texture for near-grayscale
+  images (with Floyd–Steinberg only when the source is tonally rich), dominant sampling for
+  flat-color art vs averaging for photos, ~10 in finished width at the working gauge for sizing
+  (small pixel-art sources map 1 stitch per pixel), and seamless blending matched to the repeat
+  direction when a repeat is requested without an explicit seamless mode. The response reports
+  `resolvedOptions` (the concrete settings used) plus `autoDecisions` (each auto-chosen field
+  with a human-readable reason). UI: settings default to **Auto (recommended)**, showing what
+  was picked and why, with a "Customize these settings" button that switches to the manual
+  controls pre-filled with auto's choices. 17 new core tests, 3 API integration tests, 3 web
+  component tests.
+
+### Changed
+
+- **Requesting a `repeat` without specifying `seamless` now auto-blends the joined edges** in
+  the repeat direction(s) instead of defaulting to `none` — a repeated motif with visible seams
+  is almost never what was wanted. Pass `seamless: "none"` explicitly to keep hard joins.
+
 ### Fixed
 
 - **Repeat appeared "not to work" when `motif width × repeat` exceeded the 400-stitch grid

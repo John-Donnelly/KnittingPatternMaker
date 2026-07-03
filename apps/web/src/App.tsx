@@ -13,6 +13,7 @@ import {
   type YardageEstimate,
 } from 'knitting-pattern-core';
 import { ImageUploader } from './components/ImageUploader.js';
+import { LandingPage } from './components/LandingPage.js';
 import { ControlsPanel, type FormState } from './components/ControlsPanel.js';
 import { CropPreview } from './components/CropPreview.js';
 import { ChartView } from './components/ChartView.js';
@@ -29,9 +30,11 @@ import {
 } from './api/types.js';
 import { useImageDimensions } from './hooks/useImageDimensions.js';
 import { useDebouncedValue } from './hooks/useDebouncedValue.js';
+import { useAuth, type AuthStatus } from './hooks/useAuth.js';
 import { readPatternFromLocation } from './shareLink.js';
 
 const DEFAULT_FORM: FormState = {
+  mode: 'auto',
   technique: 'stranded',
   widthStitches: 40,
   heightRows: 40,
@@ -79,6 +82,20 @@ function loadSharedView(): SharedView | null {
 
 export function App() {
   const [sharedView, setSharedView] = useState<SharedView | null>(() => loadSharedView());
+  const { auth, signOut } = useAuth();
+
+  // Tiny path router: '/' is the landing page, '/app' is the pattern maker. Share links
+  // (#p=...) take precedence on any path.
+  const [route, setRoute] = useState(() => window.location.pathname);
+  useEffect(() => {
+    const onPopState = () => setRoute(window.location.pathname);
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+  const navigate = (path: string) => {
+    window.history.pushState(null, '', path);
+    setRoute(path);
+  };
 
   const [file, setFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -100,8 +117,8 @@ export function App() {
     setError(null);
   };
 
-  const crop: CropRect | null = useMemo(() => {
-    if (!sourceDims) return null;
+  const manualCrop: CropRect | null = useMemo(() => {
+    if (!sourceDims || debouncedForm.mode === 'auto') return null;
     if (debouncedForm.cropMode === 'full') {
       return { x: 0, y: 0, width: sourceDims.width, height: sourceDims.height };
     }
@@ -114,25 +131,35 @@ export function App() {
     );
   }, [sourceDims, debouncedForm]);
 
+  // What the crop preview shows: the client-side crop in custom mode, the backend's resolved
+  // crop in auto mode (auto sends no crop and lets the backend choose).
+  const crop: CropRect | null = form.mode === 'auto' ? (response?.crop ?? null) : manualCrop;
+
   useEffect(() => {
-    if (!file || !crop) return;
+    if (!file) return;
+    if (debouncedForm.mode === 'custom' && !manualCrop) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
 
     const gauge = formGauge(debouncedForm);
-    const options: PatternOptions = {
-      technique: debouncedForm.technique,
-      widthStitches: debouncedForm.widthStitches,
-      heightRows: debouncedForm.heightRows,
-      maxColors: debouncedForm.maxColors,
-      dither: debouncedForm.dither,
-      sampling: debouncedForm.sampling,
-      crop,
-      seamless: debouncedForm.seamless,
-      repeat: { across: debouncedForm.repeatAcross, down: debouncedForm.repeatDown },
-      ...(gauge ? { gauge } : {}),
-    };
+    // Auto mode sends an empty request: the backend chooses every setting from the image
+    // and reports its choices (and reasons) back in resolvedOptions / autoDecisions.
+    const options: PatternOptions =
+      debouncedForm.mode === 'auto'
+        ? {}
+        : {
+            technique: debouncedForm.technique,
+            widthStitches: debouncedForm.widthStitches,
+            heightRows: debouncedForm.heightRows,
+            maxColors: debouncedForm.maxColors,
+            dither: debouncedForm.dither,
+            sampling: debouncedForm.sampling,
+            ...(manualCrop ? { crop: manualCrop } : {}),
+            seamless: debouncedForm.seamless,
+            repeat: { across: debouncedForm.repeatAcross, down: debouncedForm.repeatDown },
+            ...(gauge ? { gauge } : {}),
+          };
 
     submitPattern(file, options)
       .then((res) => {
@@ -151,7 +178,29 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [file, crop, debouncedForm]);
+  }, [file, manualCrop, debouncedForm]);
+
+  /** Switch to custom mode pre-filled with what auto picked, so it can be tweaked from there. */
+  const customizeFromAuto = () => {
+    const resolved = response?.resolvedOptions;
+    if (!resolved) return;
+    setForm({
+      mode: 'custom',
+      technique: resolved.technique,
+      widthStitches: resolved.widthStitches,
+      heightRows: resolved.heightRows,
+      useGauge: resolved.gauge !== undefined,
+      stitchesPer4In: resolved.gauge?.stitchesPer4In ?? DEFAULT_FORM.stitchesPer4In,
+      rowsPer4In: resolved.gauge?.rowsPer4In ?? DEFAULT_FORM.rowsPer4In,
+      maxColors: resolved.maxColors,
+      dither: resolved.dither,
+      sampling: resolved.sampling,
+      cropMode: 'auto',
+      seamless: resolved.seamless,
+      repeatAcross: resolved.repeat.across,
+      repeatDown: resolved.repeat.down,
+    });
+  };
 
   const startNewPattern = () => {
     setSharedView(null);
@@ -166,7 +215,7 @@ export function App() {
     };
     return (
       <main className="app">
-        <Header />
+        <Header auth={auth} onSignOut={signOut} />
         <div className="panel">
           <p>
             Viewing a shared pattern.{' '}
@@ -187,18 +236,49 @@ export function App() {
     );
   }
 
-  const gauge = formGauge(form);
+  // Ground the result view in what the pattern was actually generated with (the response's
+  // resolved options), not the possibly-not-yet-submitted form state.
+  const resolvedGauge = response?.resolvedOptions.gauge;
+
+  if (route !== '/app') {
+    return (
+      <main className="app">
+        <Header auth={auth} onSignOut={signOut} />
+        <LandingPage onGetStarted={() => navigate('/app')} />
+      </main>
+    );
+  }
+
+  const mustSignIn = auth !== null && auth.authRequired && !auth.authenticated;
+  if (mustSignIn) {
+    return (
+      <main className="app">
+        <Header auth={auth} onSignOut={signOut} />
+        <div className="panel">
+          <p>Sign in to start making patterns.</p>
+          <a className="landing__cta" href="/api/auth/login">
+            Sign in
+          </a>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="app">
-      <Header />
+      <Header auth={auth} onSignOut={signOut} />
 
       <ImageUploader onImageSelected={onImageSelected} />
 
       {imageUrl && sourceDims && (
         <div className="layout">
           <div className="layout__side">
-            <ControlsPanel value={form} onChange={setForm} />
+            <ControlsPanel
+              value={form}
+              onChange={setForm}
+              autoDecisions={form.mode === 'auto' ? (response?.autoDecisions ?? null) : null}
+              onCustomize={response ? customizeFromAuto : undefined}
+            />
             {crop && (
               <CropPreview
                 imageUrl={imageUrl}
@@ -217,14 +297,14 @@ export function App() {
                 {loading && <p className="hint">Updating…</p>}
                 <ResultView
                   grid={response.grid}
-                  gauge={gauge}
+                  gauge={resolvedGauge}
                   pattern={response.pattern}
                   yardage={response.yardage}
                   specBody={{
-                    technique: form.technique,
+                    technique: response.resolvedOptions.technique,
                     grid: response.grid,
                     seamless: response.seamless !== 'none',
-                    ...(gauge ? { gauge } : {}),
+                    ...(resolvedGauge ? { gauge: resolvedGauge } : {}),
                   }}
                   shareUrl={`${window.location.origin}${window.location.pathname}#p=${response.shareLink}`}
                   finishedSize={response.finishedSize}
@@ -240,11 +320,29 @@ export function App() {
   );
 }
 
-function Header() {
+function Header({ auth, onSignOut }: { auth: AuthStatus | null; onSignOut: () => void }) {
   return (
     <header className="app__header">
-      <h1>Knitting Pattern Maker</h1>
-      <p>Turn any image into deterministic pixel art and a complete knitting pattern.</p>
+      <div>
+        <h1>Knitting Pattern Maker</h1>
+        <p>Turn any image into deterministic pixel art and a complete knitting pattern.</p>
+      </div>
+      {auth?.authEnabled && (
+        <div className="app__auth">
+          {auth.authenticated ? (
+            <>
+              <span className="app__auth-user">{auth.user?.name ?? auth.user?.email ?? ''}</span>
+              <button type="button" onClick={onSignOut}>
+                Sign out
+              </button>
+            </>
+          ) : (
+            <a className="app__auth-link" href="/api/auth/login">
+              Sign in
+            </a>
+          )}
+        </div>
+      )}
     </header>
   );
 }

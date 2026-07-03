@@ -1,6 +1,7 @@
 import {
   MAX_COLORS,
   MAX_GRID_DIMENSION,
+  type AutoDecision,
   type DitherMode,
   type SamplingMode,
   type SeamlessMode,
@@ -8,6 +9,8 @@ import {
 } from 'knitting-pattern-core';
 
 export interface FormState {
+  /** 'auto' sends no settings — the backend picks everything from the image and reports why. */
+  mode: 'auto' | 'custom';
   technique: Technique;
   widthStitches: number;
   heightRows: number;
@@ -26,6 +29,10 @@ export interface FormState {
 interface Props {
   value: FormState;
   onChange: (next: FormState) => void;
+  /** Auto mode's choices for the current pattern (shown with reasons while mode is 'auto'). */
+  autoDecisions?: AutoDecision[] | null | undefined;
+  /** Switches to custom mode seeded with auto's resolved settings. */
+  onCustomize?: (() => void) | undefined;
 }
 
 const TECHNIQUE_OPTIONS: { value: Technique; label: string; hint: string }[] = [
@@ -46,7 +53,7 @@ const TECHNIQUE_OPTIONS: { value: Technique; label: string; hint: string }[] = [
   },
 ];
 
-export function ControlsPanel({ value, onChange }: Props) {
+export function ControlsPanel({ value, onChange, autoDecisions, onCustomize }: Props) {
   const set = <K extends keyof FormState>(key: K, next: FormState[K]) =>
     onChange({ ...value, [key]: next });
 
@@ -54,6 +61,59 @@ export function ControlsPanel({ value, onChange }: Props) {
     <fieldset className="panel">
       <legend>Pattern settings</legend>
 
+      <label className="field">
+        <span>Settings</span>
+        <select
+          value={value.mode}
+          aria-describedby="mode-hint"
+          onChange={(e) => set('mode', e.target.value as FormState['mode'])}
+        >
+          <option value="auto">Auto (recommended)</option>
+          <option value="custom">Custom</option>
+        </select>
+      </label>
+      <span id="mode-hint" className="field__hint">
+        {value.mode === 'auto'
+          ? 'Analyzes the image and picks the technique, size, colors, and sampling for you.'
+          : 'Set every option yourself.'}
+      </span>
+
+      {value.mode === 'auto' && (
+        <>
+          {autoDecisions && autoDecisions.length > 0 && (
+            <ul className="auto-decisions">
+              {autoDecisions.map((d) => (
+                <li key={d.field} className="auto-decisions__item">
+                  <strong>
+                    {d.field}: {d.value}
+                  </strong>{' '}
+                  — {d.reason}
+                </li>
+              ))}
+            </ul>
+          )}
+          {onCustomize && (
+            <button type="button" onClick={onCustomize}>
+              Customize these settings
+            </button>
+          )}
+        </>
+      )}
+
+      {value.mode === 'custom' && <CustomControls value={value} set={set} />}
+    </fieldset>
+  );
+}
+
+function CustomControls({
+  value,
+  set,
+}: {
+  value: FormState;
+  set: <K extends keyof FormState>(key: K, next: FormState[K]) => void;
+}) {
+  return (
+    <>
       <label className="field">
         <span>Technique</span>
         <select
@@ -242,7 +302,7 @@ export function ControlsPanel({ value, onChange }: Props) {
           this to the direction(s) you&rsquo;re repeating.
         </span>
       </fieldset>
-    </fieldset>
+    </>
   );
 }
 

@@ -5,6 +5,7 @@ import { ControlsPanel, type FormState } from '../src/components/ControlsPanel.j
 
 function baseForm(overrides: Partial<FormState> = {}): FormState {
   return {
+    mode: 'custom',
     technique: 'stranded',
     widthStitches: 40,
     heightRows: 40,
@@ -23,6 +24,47 @@ function baseForm(overrides: Partial<FormState> = {}): FormState {
 }
 
 describe('ControlsPanel', () => {
+  it('defaults to hiding all manual fields in auto mode', () => {
+    render(<ControlsPanel value={baseForm({ mode: 'auto' })} onChange={() => {}} />);
+    expect(screen.queryByLabelText('Technique')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Width (stitches)')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Sampling')).not.toBeInTheDocument();
+  });
+
+  it('shows auto decisions with reasons and a customize button in auto mode', async () => {
+    const user = userEvent.setup();
+    const onCustomize = vi.fn();
+    render(
+      <ControlsPanel
+        value={baseForm({ mode: 'auto' })}
+        onChange={() => {}}
+        autoDecisions={[
+          {
+            field: 'technique',
+            value: 'stranded',
+            reason: 'Almost every row uses at most 2 colors.',
+          },
+        ]}
+        onCustomize={onCustomize}
+      />,
+    );
+    expect(screen.getByText(/technique: stranded/i)).toBeInTheDocument();
+    expect(screen.getByText(/at most 2 colors/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /customize these settings/i }));
+    expect(onCustomize).toHaveBeenCalled();
+  });
+
+  it('switches between auto and custom via the settings select', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<ControlsPanel value={baseForm({ mode: 'auto' })} onChange={onChange} />);
+
+    await user.selectOptions(screen.getByLabelText('Settings'), 'custom');
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ mode: 'custom' }));
+  });
+
   it('hides the max-colors slider for the texture technique', () => {
     render(<ControlsPanel value={baseForm({ technique: 'texture' })} onChange={() => {}} />);
     expect(screen.queryByText(/Max colors/)).not.toBeInTheDocument();

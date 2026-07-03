@@ -1,4 +1,5 @@
 import type {
+  AutoDecision,
   CropRect,
   DitherMode,
   FinishedSize,
@@ -6,23 +7,25 @@ import type {
   GridJson,
   PatternResultJson,
   RepeatSpec,
+  ResolvedPatternOptions,
   SamplingMode,
   SeamlessMode,
   Technique,
   YardageEstimate,
 } from 'knitting-pattern-core';
 
+/** Every field optional: anything unset is chosen by the backend's auto mode from the image. */
 export interface PatternOptions {
-  technique: Technique;
-  widthStitches: number;
-  heightRows: number;
+  technique?: Technique;
+  widthStitches?: number;
+  heightRows?: number;
   gauge?: GaugeSpec;
-  maxColors: number;
-  dither: DitherMode;
-  sampling: SamplingMode;
+  maxColors?: number;
+  dither?: DitherMode;
+  sampling?: SamplingMode;
   crop?: CropRect;
-  seamless: SeamlessMode;
-  repeat: RepeatSpec;
+  seamless?: SeamlessMode;
+  repeat?: RepeatSpec;
 }
 
 export interface PatternResponse {
@@ -36,6 +39,10 @@ export interface PatternResponse {
   seamless: SeamlessMode;
   repeat: RepeatSpec;
   motif: { widthStitches: number; heightRows: number };
+  /** The concrete options the pattern was generated with (user's + auto-chosen). */
+  resolvedOptions: ResolvedPatternOptions;
+  /** Choices auto mode made for fields the request left unset, with reasons. */
+  autoDecisions: AutoDecision[];
 }
 
 export interface PatternSpecBody {
