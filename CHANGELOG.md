@@ -54,6 +54,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Chart detection cropped the design's darkest rows off.** Grid lines over solid dark
+  cells are much fainter than over light ones, so the peak chain ended ~5 rows early on a
+  real forest chart and the output cut mid-motif (a truncated trunk row showed as an odd
+  fringe along the bottom of tiled borders). Once the strong chain pins the pitch, the
+  lattice now extends outward under a relaxed per-line test — locally distinct vs the
+  half-pitch neighborhood plus an absolute energy floor so blank margins never extend.
+  The forest chart recovers all 39×50 cells (was 39×45).
 - **Side panel overflowed under the results column.** `<fieldset>` has
   `min-inline-size: min-content` and grid items refuse to shrink by default, so the controls
   fieldset overflowed its 320px column and overlapped the results text (visible in user

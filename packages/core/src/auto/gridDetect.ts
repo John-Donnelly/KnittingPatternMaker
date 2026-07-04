@@ -112,6 +112,17 @@ function findPeaks(profile: Float64Array, mean: number): number[] {
   return peaks;
 }
 
+/** Edge energy at a candidate line position: the strongest edge within +-1px (a grid line
+ * produces edges on both flanks, and JPEG shifts them a little). */
+function positionEnergy(profile: Float64Array, x: number): number {
+  let best = 0;
+  for (let dx = -1; dx <= 1; dx++) {
+    const v = profile[x + dx];
+    if (v !== undefined && v > best) best = v;
+  }
+  return best;
+}
+
 function median(values: number[]): number {
   const sorted = values.slice().sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
@@ -183,13 +194,67 @@ function chartAxisChain(peaks: number[]): AxisChain | null {
   };
 }
 
+/**
+ * Extends an established chain outward one pitch at a time using a RELAXED per-line test.
+ * The strong chain proves the grid exists and pins the pitch; beyond its ends, grid lines
+ * over dark/low-contrast content are too faint for the global peak threshold (the exact
+ * failure seen on a real chart whose bottom rows are solid dark: the design's last rows
+ * were cropped off mid-motif). With the pitch known, it is enough that the candidate
+ * position is locally distinct — clearly stronger than its half-pitch neighborhood — and
+ * above an absolute floor so a blank margin (uniform paper, near-zero edge energy
+ * everywhere) never extends.
+ */
+function extendChain(profile: Float64Array, chain: AxisChain): AxisChain {
+  // Average energy of an in-chain line position: the reference for the absolute floor.
+  let refSum = 0;
+  let refCount = 0;
+  for (let pos = chain.start; pos <= chain.end + 0.1; pos += chain.pitch) {
+    refSum += positionEnergy(profile, Math.round(pos));
+    refCount++;
+  }
+  const floor = (refCount > 0 ? refSum / refCount : 0) * 0.1;
+
+  const locallyDistinctLine = (posFloat: number): boolean => {
+    const pos = Math.round(posFloat);
+    if (pos < 1 || pos >= profile.length - 1) return false;
+    const energy = positionEnergy(profile, pos);
+    if (energy <= floor) return false;
+    const half = Math.max(2, Math.floor(chain.pitch / 2));
+    let neighborhoodSum = 0;
+    let neighborhoodCount = 0;
+    for (let x = pos - half; x <= pos + half; x++) {
+      if (x < 0 || x >= profile.length || Math.abs(x - pos) <= 1) continue;
+      neighborhoodSum += profile[x] ?? 0;
+      neighborhoodCount++;
+    }
+    const neighborhoodMean = neighborhoodCount > 0 ? neighborhoodSum / neighborhoodCount : 0;
+    return energy > neighborhoodMean * 1.5;
+  };
+
+  let { start, end, lines } = chain;
+  for (let next = end + chain.pitch; next < profile.length; next += chain.pitch) {
+    if (!locallyDistinctLine(next)) break;
+    end = next;
+    lines++;
+  }
+  for (let next = start - chain.pitch; next >= 0; next -= chain.pitch) {
+    if (!locallyDistinctLine(next)) break;
+    start = next;
+    lines++;
+  }
+
+  return { pitch: chain.pitch, start: Math.round(start), end: Math.round(end), lines };
+}
+
 export function detectChartGrid(source: PixelBuffer): ChartGridDetection | null {
   if (source.width < MIN_PITCH * MIN_LINES || source.height < MIN_PITCH * MIN_LINES) return null;
 
   const { col, row } = edgeProfiles(source);
-  const xChain = chartAxisChain(findPeaks(col, meanOf(col)));
-  const yChain = chartAxisChain(findPeaks(row, meanOf(row)));
-  if (!xChain || !yChain) return null;
+  const xChainRaw = chartAxisChain(findPeaks(col, meanOf(col)));
+  const yChainRaw = chartAxisChain(findPeaks(row, meanOf(row)));
+  if (!xChainRaw || !yChainRaw) return null;
+  const xChain = extendChain(col, xChainRaw);
+  const yChain = extendChain(row, yChainRaw);
 
   // A real chart has near-square-ish cells in source pixels; wildly different pitches mean
   // the two axes latched onto unrelated structures.
