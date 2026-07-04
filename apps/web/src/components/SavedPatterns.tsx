@@ -95,7 +95,9 @@ export function MyPatterns({
       });
   };
 
-  const remove = (id: number) => {
+  const remove = (id: number, name: string) => {
+    // Deleting is permanent (patterns are only stored server-side) — always confirm.
+    if (!window.confirm(`Delete "${name}"? This can't be undone.`)) return;
     deleteSavedPattern(id)
       .then(reload)
       .catch((err: unknown) => {
@@ -118,12 +120,18 @@ export function MyPatterns({
             <li key={p.id} className="saved-list__row">
               <span className="saved-list__name">{p.name}</span>
               <span className="saved-list__meta">
-                {p.technique} · {p.width}×{p.height}
+                {p.technique} · {p.width}×{p.height} ·{' '}
+                {new Date(p.createdAt * 1000).toLocaleDateString()}
               </span>
               <button type="button" onClick={() => open(p.id)}>
                 Open
               </button>
-              <button type="button" className="button--quiet" onClick={() => remove(p.id)}>
+              <button
+                type="button"
+                className="button--quiet"
+                aria-label={`Delete ${p.name}`}
+                onClick={() => remove(p.id, p.name)}
+              >
                 Delete
               </button>
             </li>

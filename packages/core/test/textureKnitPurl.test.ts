@@ -43,6 +43,33 @@ describe('quantizeTexture', () => {
     expect(Array.from(a.indices)).toEqual(Array.from(b.indices));
     expect(a.palette).toEqual(b.palette);
   });
+
+  it('preserves gamma: a neutral sRGB gray maps to (about) the same gray, not darker', () => {
+    // sRGB 128 has linear luminance ~0.216. Storing that linear value back into channels
+    // (the old bug) would re-read it as sRGB 55 — a huge darkening. Correct round-trip
+    // keeps the gray at ~128.
+    const samples: RGB[] = [
+      { r: 128, g: 128, b: 128 },
+      { r: 128, g: 128, b: 128 },
+      { r: 0, g: 0, b: 0 },
+      { r: 0, g: 0, b: 0 },
+    ];
+    const grid = quantizeTexture(samples, 2, 2, 'none');
+    const lightest = grid.palette[grid.palette.length - 1];
+    expect(Math.abs((lightest?.r ?? 0) - 128)).toBeLessThanOrEqual(2);
+  });
+
+  it('keeps two distinct mid-grays as two tones (wool-shade merge must not flatten texture)', () => {
+    // These grays are ~6 deltaE apart — inside the default wool merge threshold, but a
+    // texture chart MUST keep its two tones or the whole motif becomes plain stockinette.
+    const samples: RGB[] = [];
+    for (let i = 0; i < 50; i++) samples.push({ r: 120, g: 120, b: 120 });
+    for (let i = 0; i < 50; i++) samples.push({ r: 136, g: 136, b: 136 });
+    const grid = quantizeTexture(samples, 10, 10, 'none');
+    expect(grid.palette).toHaveLength(2);
+    const tones = new Set(Array.from(grid.indices));
+    expect(tones.size).toBe(2);
+  });
 });
 
 describe('generateTexturePattern', () => {

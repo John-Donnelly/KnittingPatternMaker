@@ -93,6 +93,8 @@ export const PatternSpecBodySchema = z
     /** Informational only (the grid already has any seamless blending baked in) — lets the
      * PDF print a note that the pattern is designed to repeat. */
     seamless: z.boolean().optional(),
+    /** Pattern title shown on the PDF and used for the download filename. */
+    title: z.string().trim().min(1).max(80).optional(),
   })
   .refine((spec) => spec.grid.indices.length === spec.grid.width * spec.grid.height, {
     message: 'grid.indices length must equal grid.width * grid.height',

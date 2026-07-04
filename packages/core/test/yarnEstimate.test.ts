@@ -36,6 +36,29 @@ describe('estimateYardage', () => {
     expect(estimate.perColor[0]?.estimatedYards).toBeCloseTo((16 + 1.6) / 36, 6);
   });
 
+  it('charges edge carries for rows a stranded color skips between uses', () => {
+    // Color 1 appears in rows 0 and 3 but not rows 1-2: in stranded work the yarn is carried
+    // up the side across those 2 rows, costing 2 x stitch-height of extra length.
+    const rows = [
+      [1, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [1, 0, 0, 0],
+    ];
+    const grid: Grid = {
+      width: 4,
+      height: 4,
+      indices: Uint16Array.from(rows.flat()),
+      palette: [COLOR, { r: 200, g: 30, b: 30 }],
+    };
+    const gauge = { stitchesPer4In: 20, rowsPer4In: 20 }; // stitch height 0.2in
+    const withCarries = estimateYardage(grid, gauge, new Map());
+    expect(withCarries.perColor[1]?.floatInches).toBeCloseTo(2 * 0.2, 6);
+    // Without a floats map (non-stranded techniques cut/bobbin the yarn), no carry charge.
+    const withoutCarries = estimateYardage(grid, gauge);
+    expect(withoutCarries.perColor[1]?.floatInches).toBe(0);
+  });
+
   it('splits yardage across multiple colors by stitch count', () => {
     const grid: Grid = {
       width: 4,

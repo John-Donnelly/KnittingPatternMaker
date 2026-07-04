@@ -54,6 +54,26 @@ export function LandingPage({ onGetStarted }: Props) {
         ))}
       </section>
 
+      <section className="landing__pricing" aria-label="Pricing">
+        <h3>Knitter&rsquo;s Club</h3>
+        <p className="landing__price">
+          £2.99<small>/month</small>
+        </p>
+        <ul>
+          <li>Unlimited pattern generation</li>
+          <li>Professional PDF exports with chart symbols</li>
+          <li>Your saved pattern library, on any device</li>
+          <li>Seamless repeats, gauge-aware charts, yarn estimates</li>
+        </ul>
+        <button type="button" className="landing__cta" onClick={onGetStarted}>
+          Start knitting
+        </button>
+        <p className="landing__pricing-note">
+          Free during early access — subscriptions launch soon, and early-access patterns stay
+          yours.
+        </p>
+      </section>
+
       <section className="landing__how">
         <h3>How it works</h3>
         <ol>

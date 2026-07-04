@@ -1,5 +1,5 @@
 import type { DitherMode, Grid, RGB } from '../types.js';
-import { relativeLuminance } from '../color/lab.js';
+import { linearToSrgbChannel, relativeLuminance } from '../color/lab.js';
 import { quantizeGrid } from '../image/quantizeGrid.js';
 import { chartRowToGridRow, isRightSideRow, toKnittingOrder } from './chartOrder.js';
 import { runLengthEncode, type Run } from './runLength.js';
@@ -20,13 +20,17 @@ export interface TexturePattern {
 }
 
 /**
- * Converts RGB samples to grayscale using linear-light relative luminance (see
- * color/lab.ts#relativeLuminance), so tone quantization is based on perceived brightness
- * rather than hue/saturation.
+ * Converts RGB samples to grayscale using relative luminance, RE-ENCODED to gamma sRGB.
+ * The luminance itself is computed in linear light (perceptually correct weighting of
+ * R/G/B), but the resulting gray must be written back as a gamma-encoded channel value:
+ * everything downstream (Lab conversion, dithering, palette refinement) interprets channel
+ * values as sRGB. Storing the linear value directly double-decodes the gamma — a mid-gray
+ * (Y = 0.5) would be read as sRGB 128 -> linear 0.216, skewing every texture chart dark and
+ * misplacing the two-tone split.
  */
 function toGrayscaleSamples(samples: readonly RGB[]): RGB[] {
   return samples.map((s) => {
-    const l = Math.round(relativeLuminance(s) * 255);
+    const l = Math.round(linearToSrgbChannel(relativeLuminance(s)) * 255);
     return { r: l, g: l, b: l };
   });
 }
@@ -35,6 +39,10 @@ function toGrayscaleSamples(samples: readonly RGB[]): RGB[] {
  * Quantizes an image down to (at most) two tones for a single-color knit/purl texture chart.
  * Reuses the same deterministic median-cut + dither pipeline as color techniques, applied to
  * grayscale samples, so behavior (and determinism guarantees) stay consistent across the app.
+ *
+ * Wool-shade merging is explicitly DISABLED here: the whole point of the texture chart is a
+ * two-tone split, and the default delta-E 10 merge can collapse two legitimately distinct
+ * grays into one — which flattens the entire motif into plain stockinette.
  */
 export function quantizeTexture(
   samples: readonly RGB[],
@@ -42,7 +50,11 @@ export function quantizeTexture(
   height: number,
   dither: DitherMode,
 ): Grid {
-  return quantizeGrid(toGrayscaleSamples(samples), width, height, { maxColors: 2, dither });
+  return quantizeGrid(toGrayscaleSamples(samples), width, height, {
+    maxColors: 2,
+    dither,
+    shadeMergeDeltaE: 0,
+  });
 }
 
 /**

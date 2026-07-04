@@ -9,7 +9,7 @@
     sans-serif;
   /* Warm wool palette: cream fabric, terracotta yarn, sage accents. */
   --ink: #3a3226;
-  --muted: #8a7f6e;
+  --muted: #6f6553; /* 5:1 on the cream background (WCAG AA small text) */
   --border: #e4d9c6;
   --bg: #faf5ec;
   --panel-bg: #fffdf8;
@@ -72,7 +72,8 @@ button,
   padding: 9px 18px;
   border-radius: 999px;
   border: 1px solid var(--accent-dark);
-  background: var(--accent);
+  /* accent-dark, not accent: white-on-terracotta needs the darker shade for AA contrast */
+  background: var(--accent-dark);
   color: #fff;
   font-size: 0.9rem;
   font-weight: 700;
@@ -93,7 +94,7 @@ button:disabled {
 button:not(:disabled):hover,
 .app__auth-link:hover,
 .landing__cta:hover {
-  background: var(--accent-dark);
+  background: #8f4527;
   transform: translateY(-1px);
 }
 
@@ -176,6 +177,11 @@ fieldset.subpanel {
 @media (max-width: 800px) {
   .layout {
     grid-template-columns: 1fr;
+  }
+
+  /* On phones, show the generated chart FIRST; settings stack below it. */
+  .layout__main {
+    order: -1;
   }
 }
 
@@ -559,4 +565,124 @@ fieldset.subpanel {
   margin: 16px auto;
   max-width: 520px;
   line-height: 1.8;
+}
+
+.uploader__error {
+  margin: 8px 0 0;
+}
+
+.uploader__samples {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.uploader__samples-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.uploader__sample {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px dashed var(--border);
+  background: var(--panel-bg);
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.uploader__sample img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  border-radius: 6px;
+}
+
+.uploader__sample:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: none;
+}
+
+/* --- Generation flow states --------------------------------------------------- */
+
+.results-wrap--stale {
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+.conventions {
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+}
+
+.conventions summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--accent-dark);
+}
+
+.conventions ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/* --- Pricing ----------------------------------------------------------------- */
+
+.landing__pricing {
+  max-width: 420px;
+  margin: 8px auto 40px;
+  padding: 24px;
+  text-align: center;
+  background: var(--panel-bg);
+  border: 2px dashed var(--accent);
+  border-radius: 16px;
+}
+
+.landing__price {
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: var(--accent-dark);
+  margin: 4px 0;
+}
+
+.landing__price small {
+  font-size: 1rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.landing__pricing ul {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  line-height: 1.9;
+  font-size: 0.95rem;
+}
+
+.landing__pricing-note {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 10px;
+}
+
+.app__footer {
+  margin-top: 48px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border);
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--muted);
 }

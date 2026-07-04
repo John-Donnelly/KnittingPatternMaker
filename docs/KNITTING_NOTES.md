@@ -23,6 +23,13 @@ See `packages/core/src/pattern/chartOrder.ts` for the implementation and
 `packages/core/test/chartOrder.test.ts` / `strandedColorwork.test.ts` for worked examples with
 exact expected output.
 
+## Colorwork stitch letters
+
+Colorwork (stranded and intarsia) is assumed worked in flat **stockinette**: the written
+instructions say `K` on RS rows and `P` on WS rows. The color sequence is what the chart
+dictates; the stitch letter always matches the side being worked (knitting every WS row as
+written-`K` would produce garter stitch instead).
+
 ## Stranded (Fair Isle) colorwork
 
 - Practical stranded colorwork is worked with **at most 2 colors per row** — more than that

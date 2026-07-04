@@ -71,7 +71,12 @@ export function ChartView({ grid, gauge }: Props) {
 
   return (
     <div className="chart-view">
-      <canvas ref={canvasRef} className="chart-view__canvas" />
+      <canvas
+        ref={canvasRef}
+        className="chart-view__canvas"
+        role="img"
+        aria-label={`Knitting chart, ${grid.width} stitches wide by ${grid.height} rows tall, using ${grid.palette.length} color${grid.palette.length === 1 ? '' : 's'}`}
+      />
     </div>
   );
 }

@@ -22,6 +22,10 @@ export function colorworkRowRuns(grid: Grid, chartRow: number): Run<number>[] {
 export function colorworkRowInstruction(grid: Grid, chartRow: number): ColorworkRowInstruction {
   const side = isRightSideRow(chartRow) ? 'RS' : 'WS';
   const runs = colorworkRowRuns(grid, chartRow);
-  const text = `Row ${chartRow} (${side}): ${runs.map((r) => `K${r.count} ${paletteLabel(r.value)}`).join(', ')}`;
+  // Colorwork here is flat stockinette: knit across on RS rows, PURL across on WS rows.
+  // Emitting K on WS rows would instruct garter stitch and ruin the fabric if followed
+  // literally — the stitch letter must match the side being worked.
+  const stitch = side === 'RS' ? 'K' : 'P';
+  const text = `Row ${chartRow} (${side}): ${runs.map((r) => `${stitch}${r.count} ${paletteLabel(r.value)}`).join(', ')}`;
   return { chartRow, side, runs, text };
 }

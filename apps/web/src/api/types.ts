@@ -52,6 +52,8 @@ export interface PatternSpecBody {
   gauge?: GaugeSpec;
   grid: GridJson;
   seamless?: boolean;
+  /** Pattern title printed on the PDF and used in download filenames. */
+  title?: string;
 }
 
 export interface SavedPatternSummary {

@@ -8,7 +8,9 @@ import {
   type RGB as PdfRgb,
 } from 'pdf-lib';
 import {
+  finishedSize,
   paletteLabel,
+  relativeLuminance,
   stitchAspectRatio,
   type GaugeSpec,
   type Grid,
@@ -130,9 +132,35 @@ const ROW_LABEL_W = 26;
 const MIN_TILE_CELL_PT = 9;
 const MAX_CELL_PT = 18;
 const MIN_SINGLE_PAGE_CELL_PT = 8;
+/** Cells at least this big get a per-color symbol so the chart survives B&W printing and
+ * works for colorblind knitters. */
+const MIN_SYMBOL_CELL_PT = 7;
 
-function drawChart(writer: PdfWriter, grid: Grid, gauge: GaugeSpec | undefined): void {
-  const availableW = PAGE_WIDTH - MARGIN * 2 - ROW_LABEL_W;
+/**
+ * One symbol per palette index, drawn inside chart cells and shown in the legend. Standard
+ * chart practice: the background/first color stays blank; distinct high-contrast glyphs for
+ * the rest. WinAnsi-safe characters only (Helvetica).
+ */
+const COLOR_SYMBOLS = ['', 'x', 'o', '/', '+', '-', 'V', '=', 'T', 'L', 'n', 'u', 's', 'z'];
+
+export function colorSymbol(paletteIndex: number): string {
+  return COLOR_SYMBOLS[paletteIndex % COLOR_SYMBOLS.length] ?? '';
+}
+
+/** Black or white, whichever contrasts with the cell color (WCAG-ish midpoint on luminance). */
+function symbolInk(cell: RGB): PdfRgb {
+  return relativeLuminance(cell) > 0.35 ? rgb(0.08, 0.08, 0.08) : rgb(0.97, 0.97, 0.97);
+}
+
+function drawChart(
+  writer: PdfWriter,
+  grid: Grid,
+  gauge: GaugeSpec | undefined,
+  technique: Technique,
+): void {
+  // Row numbers live on BOTH sides (RS rows on the right, WS rows on the left — standard
+  // flat-chart convention), so reserve a label gutter on each side.
+  const availableW = PAGE_WIDTH - MARGIN * 2 - ROW_LABEL_W * 2;
   const availableH = PAGE_HEIGHT - MARGIN * 2 - CHART_HEADER_H - COL_LABEL_H;
   const aspect = stitchAspectRatio(gauge);
 
@@ -151,13 +179,15 @@ function drawChart(writer: PdfWriter, grid: Grid, gauge: GaugeSpec | undefined):
   const pagesAcross = Math.ceil(grid.width / tileCols);
   const pagesDown = Math.ceil(grid.height / tileRows);
 
-  writer.heading('Chart');
   if (!singlePageFits) {
     writer.paragraph(
-      `This chart is larger than one page at a legible size, so it is split into ${pagesAcross * pagesDown} tile(s) (${pagesAcross} across x ${pagesDown} down). Row/column numbers on each tile show where it fits in the full chart.`,
+      `The chart is split across ${pagesAcross * pagesDown} pages (${pagesAcross} across x ${pagesDown} down) to stay legible. Stitch and row numbers on every page show where each piece sits in the full chart.`,
       { color: MUTED, size: 9.5 },
     );
   }
+
+  const drawSymbols = cellH >= MIN_SYMBOL_CELL_PT && grid.palette.length > 1;
+  const symbolSize = Math.max(4, Math.floor(cellH * 0.62));
 
   for (let tileRow = 0; tileRow < pagesDown; tileRow++) {
     for (let tileCol = 0; tileCol < pagesAcross; tileCol++) {
@@ -169,7 +199,7 @@ function drawChart(writer: PdfWriter, grid: Grid, gauge: GaugeSpec | undefined):
 
       const title =
         pagesAcross * pagesDown > 1
-          ? `Chart — tile row ${tileRow + 1}/${pagesDown}, column ${tileCol + 1}/${pagesAcross}`
+          ? `Chart — piece ${tileRow * pagesAcross + tileCol + 1} of ${pagesAcross * pagesDown} (rows ${grid.height - Math.min(grid.height, gy0 + tileRows) + 1}–${grid.height - gy0}, sts ${grid.width - gx1 + 1}–${grid.width - gx0})`
           : 'Chart';
       writer.page.drawText(title, {
         x: MARGIN,
@@ -181,10 +211,14 @@ function drawChart(writer: PdfWriter, grid: Grid, gauge: GaugeSpec | undefined):
 
       const chartTop = PAGE_HEIGHT - MARGIN - CHART_HEADER_H;
       const originX = MARGIN + ROW_LABEL_W;
+      const tileBottomY = chartTop - (gy1 - gy0) * cellH;
 
-      // Column labels (grid x -> stitch column number, 1-indexed, image order left-to-right).
-      for (let gx = gx0; gx < gx1; gx += Math.max(1, Math.ceil(10 / Math.max(cellW, 1)))) {
-        const label = String(gx + 1);
+      // Stitch numbers count from the RIGHT edge (stitch 1 = last grid column), the
+      // direction RS rows are worked. Label stitch 1 and every 5th.
+      for (let gx = gx0; gx < gx1; gx++) {
+        const stitchNumber = grid.width - gx;
+        if (stitchNumber !== 1 && stitchNumber % 5 !== 0) continue;
+        const label = String(stitchNumber);
         const cx = originX + (gx - gx0) * cellW + cellW / 2;
         writer.page.drawText(label, {
           x: cx - writer.font.widthOfTextAtSize(label, 6) / 2,
@@ -196,25 +230,29 @@ function drawChart(writer: PdfWriter, grid: Grid, gauge: GaugeSpec | undefined):
       }
 
       for (let gy = gy0; gy < gy1; gy++) {
-        const chartRowNumber = grid.height - gy; // see docs/KNITTING_NOTES.md chart-row convention
+        const chartRowNumber = grid.height - gy; // chart row 1 = bottom of the picture
         const rowTopY = chartTop - (gy - gy0) * cellH - cellH;
 
-        if (chartRowNumber === 1 || chartRowNumber % 5 === 0 || gy === gy0) {
-          const label = String(chartRowNumber);
-          writer.page.drawText(label, {
-            x: MARGIN,
-            y: rowTopY + cellH / 2 - 3,
-            size: 6,
-            font: writer.font,
-            color: MUTED,
-          });
-        }
+        // RS (odd) rows are read right-to-left: number them on the right edge, where the
+        // knitter starts. WS (even) rows start on the left.
+        const label = String(chartRowNumber);
+        const isRs = chartRowNumber % 2 === 1;
+        writer.page.drawText(label, {
+          x: isRs
+            ? originX + (gx1 - gx0) * cellW + 4
+            : MARGIN + ROW_LABEL_W - 4 - writer.font.widthOfTextAtSize(label, 6),
+          y: rowTopY + cellH / 2 - 3,
+          size: 6,
+          font: writer.font,
+          color: MUTED,
+        });
 
         for (let gx = gx0; gx < gx1; gx++) {
           const paletteIndex = grid.indices[gy * grid.width + gx] ?? 0;
           const color = grid.palette[paletteIndex] ?? { r: 255, g: 255, b: 255 };
+          const cellX = originX + (gx - gx0) * cellW;
           writer.page.drawRectangle({
-            x: originX + (gx - gx0) * cellW,
+            x: cellX,
             y: rowTopY,
             width: cellW,
             height: cellH,
@@ -222,7 +260,49 @@ function drawChart(writer: PdfWriter, grid: Grid, gauge: GaugeSpec | undefined):
             borderColor: rgb(0.75, 0.75, 0.75),
             borderWidth: cellH >= 6 ? 0.4 : 0,
           });
+
+          // Per-color symbol: colorwork charts stay readable in B&W print and for
+          // colorblind knitters; texture charts use the standard dot-means-purl.
+          if (drawSymbols) {
+            const glyph =
+              technique === 'texture' ? (paletteIndex === 0 ? '•' : '') : colorSymbol(paletteIndex);
+            if (glyph) {
+              writer.page.drawText(glyph, {
+                x: cellX + cellW / 2 - writer.font.widthOfTextAtSize(glyph, symbolSize) / 2,
+                y: rowTopY + cellH / 2 - symbolSize * 0.36,
+                size: symbolSize,
+                font: writer.font,
+                color: symbolInk(color),
+              });
+            }
+          }
         }
+      }
+
+      // Heavier guide lines every 10 stitches/rows (counted from the right and the bottom,
+      // matching the numbering) — the standard counting aid on professional charts.
+      const guide = rgb(0.35, 0.35, 0.35);
+      for (let gx = gx0; gx <= gx1; gx++) {
+        const stitchesFromRight = grid.width - gx;
+        if (stitchesFromRight % 10 !== 0 && gx !== gx0 && gx !== gx1) continue;
+        const x = originX + (gx - gx0) * cellW;
+        writer.page.drawLine({
+          start: { x, y: chartTop },
+          end: { x, y: tileBottomY },
+          thickness: stitchesFromRight % 10 === 0 ? 0.9 : 0.5,
+          color: guide,
+        });
+      }
+      for (let gy = gy0; gy <= gy1; gy++) {
+        const rowsFromBottom = grid.height - gy;
+        if (rowsFromBottom % 10 !== 0 && gy !== gy0 && gy !== gy1) continue;
+        const y = chartTop - (gy - gy0) * cellH;
+        writer.page.drawLine({
+          start: { x: originX, y },
+          end: { x: originX + (gx1 - gx0) * cellW, y },
+          thickness: rowsFromBottom % 10 === 0 ? 0.9 : 0.5,
+          color: guide,
+        });
       }
 
       writer.y = MARGIN;
@@ -232,7 +312,12 @@ function drawChart(writer: PdfWriter, grid: Grid, gauge: GaugeSpec | undefined):
 
 // --- Section builders --------------------------------------------------------
 
-function drawLegend(writer: PdfWriter, grid: Grid, yardage: YardageEstimate): void {
+function drawLegend(
+  writer: PdfWriter,
+  grid: Grid,
+  yardage: YardageEstimate,
+  technique: Technique,
+): void {
   writer.heading('Color Legend');
   writer.paragraph(
     'Yardage is a rough estimate based on gauge and stitch count (see Materials below) — buy an extra margin per color.',
@@ -255,11 +340,23 @@ function drawLegend(writer: PdfWriter, grid: Grid, yardage: YardageEstimate): vo
       borderColor: rgb(0.5, 0.5, 0.5),
       borderWidth: 0.5,
     });
+    // The same symbol drawn in the chart cells, so the legend doubles as the symbol key.
+    const glyph = technique === 'texture' ? (i === 0 ? '•' : '') : colorSymbol(i);
+    if (glyph) {
+      writer.page.drawText(glyph, {
+        x: MARGIN + swatchSize / 2 - writer.font.widthOfTextAtSize(glyph, 9) / 2,
+        y: writer.y - swatchSize + 3.5,
+        size: 9,
+        font: writer.font,
+        color: symbolInk(color),
+      });
+    }
     const hex = `#${[color.r, color.g, color.b].map((c) => c.toString(16).padStart(2, '0')).join('')}`;
     const stitches = est?.stitchCount ?? 0;
-    const yards = est?.estimatedYards ?? 0;
+    const yards = Math.ceil(est?.estimatedYards ?? 0);
+    const meters = Math.ceil((est?.estimatedYards ?? 0) * 0.9144);
     writer.page.drawText(
-      `${paletteLabel(i)}  ${hex}  —  ${stitches} stitches  —  ~${yards.toFixed(1)} yd`,
+      `${paletteLabel(i)}  ${hex}  —  ${stitches} stitches  —  ~${yards} yd / ${meters} m`,
       {
         x: MARGIN + swatchSize + 8,
         y: writer.y - swatchSize + 3,
@@ -272,12 +369,37 @@ function drawLegend(writer: PdfWriter, grid: Grid, yardage: YardageEstimate): vo
   }
 }
 
+function drawHowToRead(writer: PdfWriter, technique: Technique): void {
+  writer.subheading('How to read this pattern');
+  const lines = [
+    'Worked flat in stockinette, bottom-up: chart row 1 is the BOTTOM row of the chart.',
+    'Odd rows are the right side (RS) — knit, reading the chart right-to-left. Even rows are the wrong side (WS) — purl, reading left-to-right.',
+  ];
+  if (technique === 'stranded') {
+    lines.push(
+      'Carry the color not in use loosely across the back; catch floats longer than ~5 stitches.',
+    );
+  }
+  if (technique === 'intarsia') {
+    lines.push(
+      'Use a separate bobbin for each color block and twist the yarns around each other at every color change to avoid holes.',
+    );
+  }
+  if (technique === 'texture') {
+    lines.push(
+      'K = knit, P = purl. The stitch letters are already flipped on WS rows so the motif reads correctly from the RS — work each row exactly as written.',
+    );
+  }
+  lines.push(
+    'To work in the round instead: read every chart row right-to-left and knit every round (no WS rows).',
+  );
+  for (const line of lines) {
+    writer.paragraph(`•  ${line}`, { size: 9.5 });
+  }
+}
+
 function drawInstructions(writer: PdfWriter, pattern: PatternResultJson): void {
   writer.heading('Row-by-Row Instructions');
-  writer.paragraph(
-    'Worked flat, bottom-up. Odd rows are RS (read right-to-left below); even rows are WS (read left-to-right). See docs/KNITTING_NOTES.md for conventions.',
-    { size: 9, color: MUTED },
-  );
   writer.spacer(4);
 
   for (const row of pattern.rows) {
@@ -327,10 +449,36 @@ function drawInstructions(writer: PdfWriter, pattern: PatternResultJson): void {
   }
 }
 
-function drawMaterials(writer: PdfWriter, yardage: YardageEstimate): void {
-  writer.heading('Materials (Estimated)');
+/** Rough yarn-weight/needle suggestion from stitch gauge (CYC standard bands). */
+function yarnSuggestion(gauge: GaugeSpec): string {
+  const sts = gauge.stitchesPer4In;
+  if (sts >= 32) return 'lace-weight yarn, 1.5-2.5 mm needles';
+  if (sts >= 27) return 'fingering / #1 super fine yarn, 2.25-3.25 mm needles';
+  if (sts >= 23) return 'sport / #2 fine yarn, 3.25-3.75 mm needles';
+  if (sts >= 21) return 'DK / #3 light yarn, 3.75-4.5 mm needles';
+  if (sts >= 16) return 'worsted-aran / #4 medium yarn, 4.5-5.5 mm needles';
+  if (sts >= 12) return 'chunky / #5 bulky yarn, 5.5-8 mm needles';
+  return 'super-bulky / #6 yarn, 8 mm+ needles';
+}
+
+function drawMaterials(
+  writer: PdfWriter,
+  yardage: YardageEstimate,
+  grid: Grid,
+  gauge: GaugeSpec | undefined,
+): void {
+  writer.heading('Materials & Size (Estimated)');
+  if (gauge) {
+    const size = finishedSize({ widthStitches: grid.width, heightRows: grid.height }, gauge);
+    writer.paragraph(
+      `Finished size at gauge: ~${size.widthIn.toFixed(1)} x ${size.heightIn.toFixed(1)} in (${(size.widthIn * 2.54).toFixed(0)} x ${(size.heightIn * 2.54).toFixed(0)} cm). The gauge suggests ${yarnSuggestion(gauge)} — always swatch and adjust.`,
+      { size: 10 },
+    );
+  }
+  const totalYd = Math.ceil(yardage.totalEstimatedYards);
+  const totalM = Math.ceil(yardage.totalEstimatedYards * 0.9144);
   writer.paragraph(
-    `Total estimated yardage: ~${yardage.totalEstimatedYards.toFixed(1)} yd across ${yardage.perColor.length} color(s). This is a rough approximation from gauge and stitch count, not a precise physical model — actual usage varies with fiber, tension, and finishing.`,
+    `Total estimated yarn: ~${totalYd} yd / ${totalM} m across ${yardage.perColor.length} color(s). This is a rough approximation from gauge and stitch count, not a precise physical model — actual usage varies with fiber, tension, and finishing. Always buy a margin over the estimate.`,
     { size: 10 },
   );
 }
@@ -344,6 +492,8 @@ export interface PdfPatternInput {
   widthStitches: number;
   heightRows: number;
   seamless?: boolean;
+  /** Pattern title shown as the document heading and in page footers. */
+  title?: string;
 }
 
 const TECHNIQUE_LABEL: Record<Technique, string> = {
@@ -354,8 +504,9 @@ const TECHNIQUE_LABEL: Record<Technique, string> = {
 
 export async function renderPatternPdf(input: PdfPatternInput): Promise<Uint8Array> {
   const writer = await PdfWriter.create();
+  const title = input.title?.trim() || 'Knitting Pattern';
 
-  writer.heading('Knitting Pattern', 20);
+  writer.heading(title, 20);
   writer.paragraph(TECHNIQUE_LABEL[input.technique], { size: 12, font: writer.boldFont });
   writer.paragraph(`${input.widthStitches} stitches x ${input.heightRows} rows`, { size: 10.5 });
 
@@ -378,16 +529,33 @@ export async function renderPatternPdf(input: PdfPatternInput): Promise<Uint8Arr
     );
   }
 
-  writer.spacer(10);
-  drawLegend(writer, input.grid, input.yardage);
+  writer.spacer(6);
+  drawHowToRead(writer, input.technique);
 
-  drawChart(writer, input.grid, input.gauge);
+  writer.spacer(10);
+  drawLegend(writer, input.grid, input.yardage, input.technique);
+
+  drawChart(writer, input.grid, input.gauge, input.technique);
 
   writer.newPage();
   drawInstructions(writer, input.pattern);
 
   writer.spacer(14);
-  drawMaterials(writer, input.yardage);
+  drawMaterials(writer, input.yardage, input.grid, input.gauge);
+
+  // Footer post-pass: "title — page N of M" on every page, so loose printed pages can be
+  // reassembled (charts are often printed and carried around).
+  const pages = writer.doc.getPages();
+  pages.forEach((page, index) => {
+    const text = `${title}  —  page ${index + 1} of ${pages.length}`;
+    page.drawText(text, {
+      x: PAGE_WIDTH - MARGIN - writer.font.widthOfTextAtSize(text, 7.5),
+      y: MARGIN / 2,
+      size: 7.5,
+      font: writer.font,
+      color: MUTED,
+    });
+  });
 
   return writer.doc.save();
 }

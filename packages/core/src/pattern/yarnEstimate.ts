@@ -25,6 +25,9 @@ export interface YardageEstimate {
 /**
  * Estimates yarn usage per color from stitch counts and gauge. `floatStitchesByColor` (from
  * `generateStrandedPattern`) adds the extra length spent carrying a color behind the work.
+ * When floats are provided (stranded work, where colors stay attached), each color is also
+ * charged for being CARRIED UP the side edge across rows where it isn't knit — between its
+ * first and last row of use the yarn still travels one stitch-height per skipped row.
  */
 export function estimateYardage(
   grid: Grid,
@@ -40,9 +43,35 @@ export function estimateYardage(
     stitchCounts[idx] = (stitchCounts[idx] ?? 0) + 1;
   }
 
+  // Edge carries (stranded only): rows between a color's first and last row of use where the
+  // color doesn't appear — the yarn is carried up the edge across each of them.
+  const skippedRows = new Array<number>(grid.palette.length).fill(0);
+  if (floatStitchesByColor) {
+    const firstRow = new Array<number>(grid.palette.length).fill(-1);
+    const lastRow = new Array<number>(grid.palette.length).fill(-1);
+    const rowsUsed = Array.from({ length: grid.palette.length }, () => 0);
+    for (let y = 0; y < grid.height; y++) {
+      const seen = new Set<number>();
+      for (let x = 0; x < grid.width; x++) {
+        seen.add(grid.indices[y * grid.width + x] ?? 0);
+      }
+      for (const idx of seen) {
+        if (firstRow[idx] === -1) firstRow[idx] = y;
+        lastRow[idx] = y;
+        rowsUsed[idx] = (rowsUsed[idx] ?? 0) + 1;
+      }
+    }
+    for (let idx = 0; idx < grid.palette.length; idx++) {
+      if (firstRow[idx] === -1) continue;
+      const span = (lastRow[idx] ?? 0) - (firstRow[idx] ?? 0) + 1;
+      skippedRows[idx] = span - (rowsUsed[idx] ?? 0);
+    }
+  }
+
   const perColor: ColorYardageEstimate[] = stitchCounts.map((stitchCount, paletteIndex) => {
     const floatStitches = floatStitchesByColor?.get(paletteIndex) ?? 0;
-    const floatInches = floatStitches * stitchWidthIn;
+    const floatInches =
+      floatStitches * stitchWidthIn + (skippedRows[paletteIndex] ?? 0) * stitchHeightIn;
     const totalInches = stitchCount * inchesPerStitch + floatInches;
     return { paletteIndex, stitchCount, floatInches, estimatedYards: totalInches / 36 };
   });

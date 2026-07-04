@@ -31,7 +31,6 @@ import {
   type PatternResponse,
   type PatternSpecBody,
 } from './api/types.js';
-import { useImageDimensions } from './hooks/useImageDimensions.js';
 import { useDebouncedValue } from './hooks/useDebouncedValue.js';
 import { useAuth, type AuthStatus } from './hooks/useAuth.js';
 import { readPatternFromLocation } from './shareLink.js';
@@ -67,9 +66,11 @@ interface SharedView {
   pattern: PatternResultJson;
   yardage: YardageEstimate;
   shareUrl: string;
+  /** How this view was reached — a share link vs the user's own library. */
+  origin: 'link' | 'saved';
 }
 
-function loadSharedView(): SharedView | null {
+function loadSharedView(origin: 'link' | 'saved' = 'link'): SharedView | null {
   const spec = readPatternFromLocation();
   if (!spec) return null;
   const pattern = buildPatternResult(spec.technique, spec.grid);
@@ -81,6 +82,7 @@ function loadSharedView(): SharedView | null {
     pattern,
     yardage,
     shareUrl: window.location.href,
+    origin,
   };
 }
 
@@ -103,22 +105,69 @@ export function App() {
 
   const [file, setFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [sourceDims, setSourceDims] = useState<{ width: number; height: number } | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [response, setResponse] = useState<PatternResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const sourceDims = useImageDimensions(imageUrl);
   const debouncedForm = useDebouncedValue(form, 400);
 
+  /** Long edge cap for client-side downscaling: bounds upload size and server memory while
+   * staying comfortably above the ~4px-per-cell floor the chart-grid detector needs on
+   * typical scans. PNGs re-encode as PNG (lossless — chart screenshots must not gain JPEG
+   * halos); everything else re-encodes as high-quality JPEG. */
+  const MAX_SOURCE_EDGE = 3000;
+
   const onImageSelected = (nextFile: File) => {
-    setFile(nextFile);
-    setImageUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(nextFile);
-    });
+    setUploadError(null);
     setResponse(null);
     setError(null);
+    void (async () => {
+      let bitmap: ImageBitmap;
+      try {
+        // Decode up front: catches HEIC/corrupt files the <input accept> filter lets through,
+        // instead of silently rendering nothing (the old behavior for iPhone photos).
+        bitmap = await createImageBitmap(nextFile);
+      } catch {
+        setUploadError(
+          "We couldn't read that image — it may be an unsupported format (like HEIC). Please use a JPG, PNG, or WebP file.",
+        );
+        return;
+      }
+      let chosen = nextFile;
+      let width = bitmap.width;
+      let height = bitmap.height;
+      if (Math.max(width, height) > MAX_SOURCE_EDGE) {
+        const scale = MAX_SOURCE_EDGE / Math.max(width, height);
+        const w = Math.max(1, Math.round(width * scale));
+        const h = Math.max(1, Math.round(height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(bitmap, 0, 0, w, h);
+          const keepPng = nextFile.type === 'image/png';
+          const blob = await new Promise<Blob | null>((resolve) =>
+            canvas.toBlob(resolve, keepPng ? 'image/png' : 'image/jpeg', 0.92),
+          );
+          if (blob) {
+            chosen = new File([blob], nextFile.name, { type: blob.type });
+            width = w;
+            height = h;
+          }
+        }
+      }
+      bitmap.close();
+      setFile(chosen);
+      setSourceDims({ width, height });
+      setImageUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(chosen);
+      });
+    })();
   };
 
   const manualCrop: CropRect | null = useMemo(() => {
@@ -233,7 +282,7 @@ export function App() {
   /** Open a saved pattern via its self-contained spec token (renders like a share link). */
   const openSavedPattern = (spec: string) => {
     window.location.hash = `p=${spec}`;
-    setSharedView(loadSharedView());
+    setSharedView(loadSharedView('saved'));
     window.scrollTo({ top: 0 });
   };
 
@@ -248,7 +297,9 @@ export function App() {
         <Header auth={auth} onSignOut={signOut} />
         <div className="panel">
           <p>
-            Viewing a shared pattern.{' '}
+            {sharedView.origin === 'saved'
+              ? 'Viewing a pattern from your library.'
+              : 'Viewing a shared pattern.'}{' '}
             <button type="button" onClick={startNewPattern}>
               Start a new pattern
             </button>
@@ -262,6 +313,9 @@ export function App() {
           specBody={specBody}
           shareUrl={sharedView.shareUrl}
         />
+        <footer className="app__footer">
+          © 2026 Knitting Pattern Maker · Patterns you generate are yours to knit, gift, and sell.
+        </footer>
       </main>
     );
   }
@@ -275,6 +329,9 @@ export function App() {
       <main className="app">
         <Header auth={auth} onSignOut={signOut} />
         <LandingPage onGetStarted={() => navigate('/app')} />
+        <footer className="app__footer">
+          © 2026 Knitting Pattern Maker · Patterns you generate are yours to knit, gift, and sell.
+        </footer>
       </main>
     );
   }
@@ -290,6 +347,9 @@ export function App() {
             Sign in
           </a>
         </div>
+        <footer className="app__footer">
+          © 2026 Knitting Pattern Maker · Patterns you generate are yours to knit, gift, and sell.
+        </footer>
       </main>
     );
   }
@@ -299,6 +359,7 @@ export function App() {
       <Header auth={auth} onSignOut={signOut} />
 
       <ImageUploader onImageSelected={onImageSelected} />
+      {uploadError && <p className="error">{uploadError}</p>}
 
       {imageUrl && sourceDims && (
         <div className="layout">
@@ -327,11 +388,13 @@ export function App() {
           </div>
 
           <div className="layout__main">
-            {loading && !response && <p className="hint">Processing…</p>}
+            {/* Screen readers announce generation progress; sighted users see the hint. */}
+            <p className="hint" role="status" aria-live="polite">
+              {loading ? (response ? 'Updating pattern…' : 'Making your pattern…') : ''}
+            </p>
             {error && <p className="error">{error}</p>}
             {response && (
-              <>
-                {loading && <p className="hint">Updating…</p>}
+              <div className={loading ? 'results-wrap results-wrap--stale' : 'results-wrap'}>
                 <ResultView
                   grid={response.grid}
                   gauge={resolvedGauge}
@@ -347,6 +410,7 @@ export function App() {
                   finishedSize={response.finishedSize}
                   seamless={response.seamless}
                   repeat={response.repeat}
+                  defaultTitle=""
                 />
                 {auth?.authenticated && (
                   <SavePatternForm
@@ -355,13 +419,16 @@ export function App() {
                     onSaved={() => setSavedRefresh((k) => k + 1)}
                   />
                 )}
-              </>
+              </div>
             )}
           </div>
         </div>
       )}
 
       {auth?.authenticated && <MyPatterns refreshKey={savedRefresh} onOpen={openSavedPattern} />}
+      <footer className="app__footer">
+        © 2026 Knitting Pattern Maker · Patterns you generate are yours to knit, gift, and sell.
+      </footer>
     </main>
   );
 }
@@ -403,6 +470,7 @@ interface ResultViewProps {
   finishedSize?: { widthIn: number; heightIn: number } | undefined;
   seamless?: SeamlessMode | undefined;
   repeat?: RepeatSpec | undefined;
+  defaultTitle?: string | undefined;
 }
 
 function ResultView({
@@ -415,6 +483,7 @@ function ResultView({
   finishedSize,
   seamless,
   repeat,
+  defaultTitle,
 }: ResultViewProps) {
   const repeated = repeat && (repeat.across > 1 || repeat.down > 1);
   return (
@@ -438,7 +507,7 @@ function ResultView({
       <LegendList grid={grid} yardage={yardage} />
       <WarningsPanel pattern={pattern} />
       <InstructionsList pattern={pattern} />
-      <ExportBar spec={specBody} shareUrl={shareUrl} />
+      <ExportBar spec={specBody} shareUrl={shareUrl} defaultTitle={defaultTitle} />
     </div>
   );
 }

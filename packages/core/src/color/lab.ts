@@ -50,6 +50,12 @@ export function labDistanceSq(a: Lab, b: Lab): number {
   return dl * dl + da * da + db * db;
 }
 
+/** Encodes a linear-light value [0,1] back to a gamma-encoded sRGB channel value [0,1]. */
+export function linearToSrgbChannel(v: number): number {
+  const clamped = Math.min(1, Math.max(0, v));
+  return clamped <= 0.0031308 ? clamped * 12.92 : 1.055 * Math.pow(clamped, 1 / 2.4) - 0.055;
+}
+
 /** Relative luminance (Rec. 709 coefficients on linear-light channels), used for stable palette ordering. */
 export function relativeLuminance({ r, g, b }: RGB): number {
   return (

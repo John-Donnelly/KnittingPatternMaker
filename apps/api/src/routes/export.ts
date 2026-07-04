@@ -11,7 +11,7 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
       return reply.code(400).send({ error: 'Invalid pattern spec', details: parsed.error.issues });
     }
 
-    const { technique, gauge, grid: gridJson, seamless } = parsed.data;
+    const { technique, gauge, grid: gridJson, seamless, title } = parsed.data;
     const grid = deserializeGrid(gridJson);
     const pattern = buildPatternResult(technique, grid);
     const yardage = buildYardageEstimate(grid, gauge, pattern);
@@ -25,10 +25,14 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
       heightRows: grid.height,
       ...(gauge ? { gauge } : {}),
       ...(seamless !== undefined ? { seamless } : {}),
+      ...(title ? { title } : {}),
     });
 
     reply.header('Content-Type', 'application/pdf');
-    reply.header('Content-Disposition', 'attachment; filename="knitting-pattern.pdf"');
+    reply.header(
+      'Content-Disposition',
+      `attachment; filename="${filenameSlug(title) ?? 'knitting-pattern'}.pdf"`,
+    );
     return reply.send(Buffer.from(pdfBytes));
   });
 
@@ -42,7 +46,23 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
     const pngBuffer = renderChartPng(grid);
 
     reply.header('Content-Type', 'image/png');
-    reply.header('Content-Disposition', 'attachment; filename="knitting-pattern-chart.png"');
+    reply.header(
+      'Content-Disposition',
+      `attachment; filename="${filenameSlug(parsed.data.title) ?? 'knitting-pattern'}-chart.png"`,
+    );
     return reply.send(pngBuffer);
   });
+}
+
+/** ASCII-safe filename slug from a user-supplied title (Content-Disposition needs plain ASCII). */
+function filenameSlug(title: string | undefined): string | null {
+  if (!title) return null;
+  const slug = title
+    .normalize('NFKD')
+    .replace(/[^\x20-\x7e]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+    .slice(0, 60);
+  return slug.length > 0 ? slug : null;
 }

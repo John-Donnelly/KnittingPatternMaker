@@ -35,9 +35,10 @@ describe('generateStrandedPattern', () => {
     expect(pattern.rows[0]).toMatchObject({ chartRow: 1, side: 'RS' });
     expect(pattern.rows[0]?.text).toBe('Row 1 (RS): K3 C1, K1 C2');
 
-    // Chart row 2 = middle image row, WS, read left-to-right: [0,1,0,1]
+    // Chart row 2 = middle image row, WS, read left-to-right: [0,1,0,1].
+    // WS rows of flat stockinette colorwork are PURLED — the stitch letter must say so.
     expect(pattern.rows[1]).toMatchObject({ chartRow: 2, side: 'WS' });
-    expect(pattern.rows[1]?.text).toBe('Row 2 (WS): K1 C1, K1 C2, K1 C1, K1 C2');
+    expect(pattern.rows[1]?.text).toBe('Row 2 (WS): P1 C1, P1 C2, P1 C1, P1 C2');
 
     // Chart row 3 = top image row, RS, uniform row
     expect(pattern.rows[2]).toMatchObject({ chartRow: 3, side: 'RS' });
