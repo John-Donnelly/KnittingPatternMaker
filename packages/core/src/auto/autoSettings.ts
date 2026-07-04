@@ -463,7 +463,15 @@ function autoTechniqueAndColors(
   const { busyRowFraction, maxRunsPerRow } = rowComplexity(evalGrid);
 
   if (busyRowFraction <= AUTO_STRANDED_MAX_BUSY_ROW_FRACTION) {
-    const maxColors = provided.maxColors ?? Math.min(evalColors, AUTO_STRANDED_MAX_PALETTE);
+    // Flat-color art keeps ALL its real colors (a sprite's gray must not dissolve into the
+    // sky because of a palette cap) — stranded handles a larger TOTAL palette fine when rows
+    // stay at 2 colors, by rotating colors across rows. Photos get the traditional small
+    // Fair Isle palette.
+    const maxColors =
+      provided.maxColors ??
+      (stats.isFlatArt
+        ? clampColors(AUTO_INTARSIA_MAX_PALETTE)
+        : Math.min(evalColors, AUTO_STRANDED_MAX_PALETTE));
     decide(
       'technique',
       'stranded',
@@ -473,7 +481,9 @@ function autoTechniqueAndColors(
       decide(
         'maxColors',
         String(maxColors),
-        `Capped at ${AUTO_STRANDED_MAX_PALETTE} total colors, in line with traditional Fair Isle palettes.`,
+        stats.isFlatArt
+          ? 'Matched to the art’s distinct colors so nothing in the design disappears; colors rotate across rows.'
+          : `Capped at ${AUTO_STRANDED_MAX_PALETTE} total colors, in line with traditional Fair Isle palettes.`,
       );
     }
     return { technique: 'stranded', maxColors };
@@ -496,9 +506,28 @@ function autoTechniqueAndColors(
     return { technique: 'intarsia', maxColors };
   }
 
-  // Busy, photo-like content: neither fits cleanly. Stranded with a small palette degrades
-  // best — floats handle scattered color better than hundreds of intarsia bobbins would, and
-  // the generator flags any rows that still exceed 2 colors.
+  // Neither fits cleanly. For flat-color ART, color fidelity wins: intarsia with the full
+  // (capped) palette keeps every element of the design visible — a high bobbin count gets a
+  // warning, but a subject silently dissolving into the background is far worse. For busy
+  // PHOTO content, stranded with a small palette degrades best: floats handle scattered
+  // color better than hundreds of bobbins, and over-2-color rows are flagged.
+  if (stats.isFlatArt) {
+    const maxColors = provided.maxColors ?? clampColors(AUTO_INTARSIA_MAX_PALETTE);
+    decide(
+      'technique',
+      'intarsia',
+      'Busy flat-color art: intarsia keeps every color of the design visible; expect a high bobbin count (listed in the instructions).',
+    );
+    if (provided.maxColors === undefined) {
+      decide(
+        'maxColors',
+        String(maxColors),
+        'Matched to the art’s distinct colors so nothing in the design disappears.',
+      );
+    }
+    return { technique: 'intarsia', maxColors };
+  }
+
   const maxColors = provided.maxColors ?? AUTO_STRANDED_MAX_PALETTE;
   decide(
     'technique',

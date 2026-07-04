@@ -136,13 +136,30 @@ describe('resolveAutoOptions', () => {
     expect(options.dither).toBe('floyd-steinberg');
   });
 
-  it('falls back to stranded with a small palette for busy photo content', () => {
-    // Per-pixel varied hues: many colors per row, far more runs than intarsia can manage.
+  it('keeps every color of busy flat-color art by falling back to intarsia', () => {
+    // Per-pixel varied flat hues: many colors per row, more runs than intarsia's comfort
+    // threshold. Color fidelity must win for ART — capping the palette here would make
+    // whole elements dissolve into the background (seen with a gray seagull on a blue sky).
     const busy = makeBuffer(200, 200, (x, y) => {
       const colors: [number, number, number][] = [RED, BLUE, GREEN, WHITE, [240, 200, 40]];
       return colors[(x * 7 + y * 13) % colors.length] ?? WHITE;
     });
     const { options } = resolveAutoOptions(busy, {});
+    expect(options.technique).toBe('intarsia');
+    expect(options.maxColors).toBeGreaterThanOrEqual(5);
+  });
+
+  it('falls back to stranded with a small palette for busy photo content', () => {
+    // Photo-like: smooth gradients plus deterministic per-pixel noise — not flat art, and
+    // too many color runs per row for intarsia.
+    let seed = 7;
+    const rand = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) % 97) - 48;
+    const busyPhoto = makeBuffer(200, 200, (x, y) => [
+      Math.max(0, Math.min(255, Math.round((x / 199) * 255) + rand())),
+      Math.max(0, Math.min(255, Math.round((y / 199) * 255) + rand())),
+      Math.max(0, Math.min(255, 128 + rand())),
+    ]);
+    const { options } = resolveAutoOptions(busyPhoto, {});
     expect(options.technique).toBe('stranded');
     expect(options.maxColors).toBeLessThanOrEqual(AUTO_STRANDED_MAX_PALETTE);
   });
