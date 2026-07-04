@@ -79,9 +79,15 @@ pipeline each endpoint runs.
 
 ## Deployment
 
-The production build is a **single deployable**: the Fastify API serves the built frontend
-(landing page at `/`, the maker at `/app`) alongside `/api`. Security headers (helmet + CSP),
-per-IP rate limiting, upload size limits, and redacted logging are on by default.
+Two supported targets, same API contract and byte-identical pattern output:
+
+- **Cloudflare (recommended for production)** — a single Worker serves the API (Hono), the
+  built SPA (static assets), and D1 storage; images decode via WASM codecs. See
+  [apps/worker/README.md](apps/worker/README.md) for setup, deploy, cost model, and WAF
+  rate-limit suggestions.
+- **Docker / any Node host** — the Fastify API serves the built frontend (landing page at
+  `/`, the maker at `/app`) alongside `/api`. Security headers (helmet + CSP), per-IP rate
+  limiting, upload size limits, and redacted logging are on by default.
 
 ```bash
 cp .env.example .env      # fill in SESSION_SECRET (and OIDC_* for sign-in)

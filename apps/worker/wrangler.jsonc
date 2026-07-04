@@ -1,0 +1,37 @@
+{
+  // Cloudflare Workers deployment: one Worker serves the API and the built SPA.
+  // Deploy steps: see README.md in this directory.
+  "name": "knitting-pattern-maker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-01",
+  // nodejs_compat: Buffer for pdf-lib internals and knitting-pattern-core's base64 helpers.
+  "compatibility_flags": ["nodejs_compat"],
+
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    // Client-side routes (/, /app) fall back to index.html; /api/* always runs the Worker.
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/health"],
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "knitting-pattern-maker",
+      // Replace with the real id from `wrangler d1 create knitting-pattern-maker`.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations",
+    },
+  ],
+
+  "vars": {
+    // Set your deployed origin; drives the OIDC redirect URI default.
+    "PUBLIC_URL": "http://localhost:8787",
+    "AUTH_REQUIRED": "false",
+    // OIDC_ISSUER / OIDC_CLIENT_ID / OIDC_REDIRECT_URI go here (non-secret).
+    // Secrets (wrangler secret put): SESSION_SECRET, OIDC_CLIENT_SECRET.
+  },
+
+  "observability": { "enabled": true },
+}

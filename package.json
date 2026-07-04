@@ -17,9 +17,11 @@
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "npm run typecheck -w packages/core && npm run build -w packages/core && npm run typecheck -w apps/api && npm run typecheck -w apps/web",
+    "typecheck": "npm run typecheck -w packages/core && npm run build -w packages/core && npm run typecheck -w apps/api && npm run typecheck -w apps/web && npm run typecheck -w apps/worker",
     "dev:web": "npm run dev --workspace=apps/web",
-    "dev:api": "npm run dev --workspace=apps/api"
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:worker": "npm run dev --workspace=apps/worker",
+    "deploy:worker": "npm run deploy --workspace=apps/worker"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
