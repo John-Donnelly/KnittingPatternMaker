@@ -9,9 +9,11 @@ import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import { CORE_VERSION } from 'knitting-pattern-core';
 import { loadConfig, type AppConfig } from './config.js';
+import { openDatabase } from './db.js';
 import { registerPatternRoute } from './routes/pattern.js';
 import { registerExportRoutes } from './routes/export.js';
 import { registerAuthRoutes, requireAuth } from './routes/auth.js';
+import { registerPatternsRoutes } from './routes/patterns.js';
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
@@ -20,6 +22,7 @@ const PROTECTED_PREFIXES = ['/api/pattern', '/api/export/'];
 
 export function buildServer(configOverrides: Parameters<typeof loadConfig>[0] = {}) {
   const config: AppConfig = loadConfig(configOverrides);
+  const db = openDatabase(config.effectiveDataDir);
 
   const app = Fastify({
     logger: {
@@ -80,9 +83,14 @@ export function buildServer(configOverrides: Parameters<typeof loadConfig>[0] = 
     }
   });
 
-  app.register(registerAuthRoutes(config));
+  app.register(registerAuthRoutes(config, db));
   app.register(registerPatternRoute);
   app.register(registerExportRoutes);
+  app.register(registerPatternsRoutes(config, db));
+
+  app.addHook('onClose', async () => {
+    db.close();
+  });
 
   // In production, serve the built frontend from the same process (single deployable).
   const staticRoot = config.staticRoot ? path.resolve(config.staticRoot) : '';

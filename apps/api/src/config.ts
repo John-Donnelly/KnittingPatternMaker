@@ -35,6 +35,9 @@ const ConfigSchema = z.object({
 
   /** Directory of the built frontend to serve in production ('' disables static serving). */
   staticRoot: z.string().default(''),
+
+  /** Where the SQLite database lives (':memory:' for tests). */
+  dataDir: z.string().default(''),
 });
 
 export type AppConfig = z.infer<typeof ConfigSchema> & {
@@ -44,6 +47,8 @@ export type AppConfig = z.infer<typeof ConfigSchema> & {
   redirectUri: string;
   /** Effective session secret (ephemeral one generated outside production). */
   effectiveSessionSecret: string;
+  /** Effective SQLite location (tests default to in-memory; otherwise ./data). */
+  effectiveDataDir: string;
 };
 
 export class ConfigError extends Error {}
@@ -63,6 +68,7 @@ export function loadConfig(overrides: Partial<z.input<typeof ConfigSchema>> = {}
     authRequired: process.env.AUTH_REQUIRED,
     rateLimitMax: process.env.RATE_LIMIT_MAX,
     staticRoot: process.env.STATIC_ROOT,
+    dataDir: process.env.DATA_DIR,
     ...stripUndefined(overrides),
   });
   if (!parsed.success) {
@@ -92,6 +98,7 @@ export function loadConfig(overrides: Partial<z.input<typeof ConfigSchema>> = {}
     redirectUri: cfg.oidcRedirectUri ?? `${cfg.publicUrl.replace(/\/$/, '')}/api/auth/callback`,
     // Outside production a missing secret gets an ephemeral one (sessions reset on restart).
     effectiveSessionSecret: cfg.sessionSecret ?? randomBytes(32).toString('hex'),
+    effectiveDataDir: cfg.dataDir || (cfg.nodeEnv === 'test' ? ':memory:' : './data'),
   };
 }
 

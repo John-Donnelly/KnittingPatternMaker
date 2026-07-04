@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { AppConfig } from '../config.js';
+import type { AppDatabase } from '../db.js';
 import {
   buildAuthorizationUrl,
   discoverOidc,
@@ -16,16 +17,18 @@ import {
   setSessionCookie,
 } from '../auth/session.js';
 
-export function registerAuthRoutes(config: AppConfig) {
+export function registerAuthRoutes(config: AppConfig, db: AppDatabase) {
   return async function authRoutes(app: FastifyInstance): Promise<void> {
-    /** Who am I? Also tells the frontend whether SSO is available/required at all. */
+    /** Who am I? Also tells the frontend whether SSO is available/required at all. The plan
+     * comes from the accounts table — the hook point for Stripe entitlements. */
     app.get('/api/auth/me', async (request) => {
       const user = getSessionUser(request);
+      const account = user ? db.getUser(user.sub) : undefined;
       return {
         authEnabled: config.oidcEnabled,
         authRequired: config.authRequired && config.oidcEnabled,
         authenticated: user !== null,
-        ...(user ? { user } : {}),
+        ...(user ? { user, plan: account?.plan ?? 'free' } : {}),
       };
     });
 
@@ -70,6 +73,7 @@ export function registerAuthRoutes(config: AppConfig) {
       try {
         const discovery = await discoverOidc(config.oidcIssuer);
         const user = await exchangeCodeForUserInfo(discovery, config, code, verifier);
+        db.upsertUser(user.sub, user.email, user.name);
         setSessionCookie(reply, config, user);
         return reply.redirect('/app', 302);
       } catch (err) {
