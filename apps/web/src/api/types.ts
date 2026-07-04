@@ -54,6 +54,20 @@ export interface PatternSpecBody {
   seamless?: boolean;
 }
 
+export interface SavedPatternSummary {
+  id: number;
+  name: string;
+  technique: Technique;
+  width: number;
+  height: number;
+  createdAt: number;
+}
+
+export interface SavedPattern extends SavedPatternSummary {
+  /** The self-contained share-spec token. */
+  spec: string;
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {

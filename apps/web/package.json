@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fontsource-variable/nunito": "^5.2.7",
     "knitting-pattern-core": "^0.1.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"

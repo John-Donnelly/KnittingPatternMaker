@@ -7,8 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Saved patterns + accounts.** Signing in gives each user a pattern library backed by
+  SQLite (`DATA_DIR`, `apps/api/src/db.ts`): **Save pattern** stores the self-contained
+  share-spec token; **My patterns** lists/opens/deletes (session-gated `/api/patterns` CRUD,
+  per-user isolation, 200-pattern cap, tokens re-validated by decoding on save). The `users`
+  table carries `plan` + `stripe_customer_id` and `GET /api/auth/me` returns `plan` — the
+  prepared Stripe integration points are documented in the README (no payment flows are
+  wired yet, deliberately). 5 API integration tests + 3 web component tests.
+- **Upscaled-pixel-art detection.** Flat-color images whose every color edge sits on one
+  lattice (integer-upscaled sprites) are mapped one stitch per underlying art pixel
+  (`detectPixelLattice`) — verified on CC0 test sprites (512² → 64×64, 1216² → 32×32).
+- **Knitting-themed UI.** Warm wool palette (cream/terracotta/sage), self-hosted Nunito
+  variable font (CSP-safe), stitched dashed panel seams, pill buttons, yarn-ball favicon and
+  branding, restyled landing page.
+
+### Changed
+
+- **Chart-grid detection rewritten as peak chaining.** The fixed-step pitch scan accumulated
+  rounding drift across large scans (a 4096px-wide scan walked off its own grid) and required
+  the grid to span the full image. Edge peaks are now chained by consistent spacing with the
+  pitch derived from chain endpoints (drift-free), tolerating a missing line and cropping to
+  the detected span. Validated against real freely-licensed charts; an autocorrelation
+  fallback for very faint archival scans was prototyped and rejected (JPEG 8×8 block
+  artifacts make ordinary photos look periodic — see docs/KNITTING_NOTES.md "Pictures of
+  pixel grids" for the documented limitation).
+
 ### Fixed
 
+- **Side panel overflowed under the results column.** `<fieldset>` has
+  `min-inline-size: min-content` and grid items refuse to shrink by default, so the controls
+  fieldset overflowed its 320px column and overlapped the results text (visible in user
+  screenshots). Both are now explicitly allowed to shrink, and the results column uses
+  `minmax(0, 1fr)`.
+- **"Use full image" could silently stretch the design.** Custom mode now shows a live
+  warning with the distortion percentage when the chosen stitch grid's knitted aspect
+  deviates >15% from the image's, with the fix spelled out.
 - **Auto mode mangled pictures of existing charts.** A photo/scan of a chart _with grid
   lines_ (e.g. a 508×664 JPEG of a 38×50 forest chart) was classified as a photo: average
   sampling blended the grid lines into every cell and the ~10in default sizing (55×98) didn't

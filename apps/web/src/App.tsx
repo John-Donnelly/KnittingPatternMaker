@@ -3,6 +3,7 @@ import {
   buildPatternResult,
   buildYardageEstimate,
   serializeGrid,
+  stitchAspectRatio,
   suggestedCropRect,
   WOOL_SHADE_DELTA_E,
   type CropRect,
@@ -15,6 +16,7 @@ import {
 } from 'knitting-pattern-core';
 import { ImageUploader } from './components/ImageUploader.js';
 import { LandingPage } from './components/LandingPage.js';
+import { MyPatterns, SavePatternForm } from './components/SavedPatterns.js';
 import { ControlsPanel, type FormState } from './components/ControlsPanel.js';
 import { CropPreview } from './components/CropPreview.js';
 import { ChartView } from './components/ChartView.js';
@@ -137,6 +139,20 @@ export function App() {
   // crop in auto mode (auto sends no crop and lets the backend choose).
   const crop: CropRect | null = form.mode === 'auto' ? (response?.crop ?? null) : manualCrop;
 
+  // "Use full image" ignores the knitted aspect ratio; warn when that visibly distorts.
+  const stretchWarning: string | null = useMemo(() => {
+    if (form.mode !== 'custom' || form.cropMode !== 'full' || !sourceDims) return null;
+    const cellAspect = stitchAspectRatio(formGauge(form));
+    const knittedAspect = (form.widthStitches * cellAspect) / form.heightRows;
+    const sourceAspect = sourceDims.width / sourceDims.height;
+    const ratio = knittedAspect / sourceAspect;
+    if (ratio >= 0.87 && ratio <= 1.15) return null;
+    const pct = Math.round(Math.abs(ratio - 1) * 100);
+    return `Heads-up: at ${form.widthStitches} × ${form.heightRows} the knitted result will be stretched ~${pct}% ${
+      ratio > 1 ? 'wider' : 'taller'
+    } than the image. Switch Crop to auto, or adjust the width/height, to keep its proportions.`;
+  }, [form, sourceDims]);
+
   useEffect(() => {
     if (!file) return;
     if (debouncedForm.mode === 'custom' && !manualCrop) return;
@@ -211,6 +227,16 @@ export function App() {
     window.history.replaceState(null, '', window.location.pathname);
   };
 
+  /** Bumped after each save so the library list refetches. */
+  const [savedRefresh, setSavedRefresh] = useState(0);
+
+  /** Open a saved pattern via its self-contained spec token (renders like a share link). */
+  const openSavedPattern = (spec: string) => {
+    window.location.hash = `p=${spec}`;
+    setSharedView(loadSharedView());
+    window.scrollTo({ top: 0 });
+  };
+
   if (sharedView) {
     const specBody: PatternSpecBody = {
       technique: sharedView.technique,
@@ -283,6 +309,13 @@ export function App() {
               autoDecisions={form.mode === 'auto' ? (response?.autoDecisions ?? null) : null}
               onCustomize={response ? customizeFromAuto : undefined}
             />
+            {stretchWarning && (
+              <div className="panel panel--warning">
+                <p className="hint" style={{ margin: 0 }}>
+                  {stretchWarning}
+                </p>
+              </div>
+            )}
             {crop && (
               <CropPreview
                 imageUrl={imageUrl}
@@ -315,11 +348,20 @@ export function App() {
                   seamless={response.seamless}
                   repeat={response.repeat}
                 />
+                {auth?.authenticated && (
+                  <SavePatternForm
+                    spec={response.shareLink}
+                    defaultName={`${response.resolvedOptions.technique} ${response.grid.width}×${response.grid.height}`}
+                    onSaved={() => setSavedRefresh((k) => k + 1)}
+                  />
+                )}
               </>
             )}
           </div>
         </div>
       )}
+
+      {auth?.authenticated && <MyPatterns refreshKey={savedRefresh} onOpen={openSavedPattern} />}
     </main>
   );
 }

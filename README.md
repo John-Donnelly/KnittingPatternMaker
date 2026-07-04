@@ -103,3 +103,24 @@ for every variable. Highlights:
 
 Run behind TLS (a reverse proxy or your platform's ingress) — session cookies are marked
 `Secure` in production.
+
+### Accounts & saved patterns
+
+Signing in (SSO) gives each user a pattern library: **Save pattern** stores the pattern's
+self-contained share-spec token server-side (SQLite at `DATA_DIR`, `apps/api/src/db.ts`), and
+**My patterns** lists/opens/deletes them. `POST/GET/DELETE /api/patterns[...]` — all
+session-gated, per-user isolated, capped at 200 patterns per account.
+
+### Stripe integration points
+
+Payments are deliberately **not** wired yet, but the seams are in place so an integration
+only touches three spots:
+
+1. **Accounts**: the `users` table already carries `plan` (default `'free'`) and
+   `stripe_customer_id`; `GET /api/auth/me` returns `plan` to the frontend.
+2. **Checkout**: add a session-gated `POST /api/billing/checkout` that creates a Stripe
+   Checkout Session (`STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` are already stubbed in
+   `.env.example`) and stores `stripe_customer_id` on the user row.
+3. **Webhook**: add `POST /api/billing/webhook` (verify with `STRIPE_WEBHOOK_SECRET`) that
+   flips `users.plan` on `checkout.session.completed` / subscription events. Gate premium
+   features by reading `plan` where `requireAuth` already runs.
