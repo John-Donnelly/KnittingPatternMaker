@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Palettes offered several colors "one shade apart".** Median-cut on photographic input
+  splits one perceived color into near-identical shades (measured on a real photo: four sky
+  shades ΔE 4.5–9.4 apart at 120×120 / 8 colors) — impossible to buy as distinct yarns and the
+  cause of banding contours ("lines") across smooth areas at larger chart sizes. Palettes are
+  now consolidated after quantization: entries closer than ΔE 10 (CIE76) merge into one "wool
+  color", weighted by stitch coverage so the dominant shade wins (transitive, deterministic;
+  `consolidatePalette` in `packages/core/src/color/consolidate.ts`). The same photo now yields
+  5 distinct colors (min pairwise ΔE ≈ 19). The palette can come out smaller than `maxColors`,
+  which is correct — it reports how many genuinely distinct yarns the image needs. 7 new tests.
+- **Chart preview showed moiré banding ("grid lines") on larger charts.** The canvas was drawn
+  at its internal resolution and CSS-downscaled; non-integer resampling ratios produce periodic
+  light/dark lines. The preview now sizes its backing store in device pixels from the actual
+  container width and sets the CSS size to exactly backing/dpr, so the bitmap maps 1:1 onto
+  device pixels and is never resampled (`computeChartLayout`, unit-tested across dprs); grid
+  lines are drawn as crisp 1-device-pixel fills instead of fractional-width strokes.
+
 ### Added
 
 - **Landing page** at `/` (hero, feature overview, how-it-works) with the pattern maker moved

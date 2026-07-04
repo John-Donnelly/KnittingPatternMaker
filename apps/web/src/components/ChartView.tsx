@@ -1,16 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { stitchAspectRatio, type GaugeSpec, type GridJson } from 'knitting-pattern-core';
+import { computeChartLayout } from '../chartLayout.js';
 
 interface Props {
   grid: GridJson;
   gauge: GaugeSpec | undefined;
 }
 
-const MAX_DISPLAY_WIDTH = 640;
-const MAX_DISPLAY_HEIGHT = 640;
-const MAX_CELL_PX = 28;
-const MIN_CELL_PX = 3;
-const GRID_LINE_MIN_CELL_PX = 6;
 const MAJOR_GRID_LINE_EVERY = 10;
 
 export function ChartView({ grid, gauge }: Props) {
@@ -19,50 +15,58 @@ export function ChartView({ grid, gauge }: Props) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
 
-    const aspect = stitchAspectRatio(gauge);
-    const cellH = Math.max(
-      MIN_CELL_PX,
-      Math.min(
-        MAX_CELL_PX,
-        Math.floor(MAX_DISPLAY_HEIGHT / grid.height),
-        Math.floor(MAX_DISPLAY_WIDTH / (grid.width * aspect)),
-      ),
-    );
-    const cellW = Math.max(1, Math.round(cellH * aspect));
+    const render = () => {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    canvas.width = cellW * grid.width;
-    canvas.height = cellH * grid.height;
+      const containerWidth = canvas.parentElement?.clientWidth || 640;
+      const layout = computeChartLayout(
+        grid.width,
+        grid.height,
+        stitchAspectRatio(gauge),
+        Math.min(containerWidth, 640),
+        window.devicePixelRatio || 1,
+      );
 
-    for (let y = 0; y < grid.height; y++) {
-      for (let x = 0; x < grid.width; x++) {
-        const paletteIndex = grid.indices[y * grid.width + x] ?? 0;
-        const color = grid.palette[paletteIndex] ?? { r: 255, g: 255, b: 255 };
-        ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
-        ctx.fillRect(x * cellW, y * cellH, cellW, cellH);
+      // Backing store in device pixels + CSS size of exactly backing/dpr: the bitmap maps
+      // 1:1 onto device pixels, so no browser resampling and no moire "grid lines".
+      canvas.width = layout.canvasW;
+      canvas.height = layout.canvasH;
+      canvas.style.width = `${layout.cssW}px`;
+      canvas.style.height = `${layout.cssH}px`;
+
+      const { cellW, cellH } = layout;
+      for (let y = 0; y < grid.height; y++) {
+        for (let x = 0; x < grid.width; x++) {
+          const paletteIndex = grid.indices[y * grid.width + x] ?? 0;
+          const color = grid.palette[paletteIndex] ?? { r: 255, g: 255, b: 255 };
+          ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+          ctx.fillRect(x * cellW, y * cellH, cellW, cellH);
+        }
       }
-    }
 
-    if (cellH >= GRID_LINE_MIN_CELL_PX) {
-      for (let x = 0; x <= grid.width; x++) {
-        ctx.strokeStyle = x % MAJOR_GRID_LINE_EVERY === 0 ? '#5a5a5a' : '#a0a0a0';
-        ctx.lineWidth = x % MAJOR_GRID_LINE_EVERY === 0 ? 1 : 0.5;
-        ctx.beginPath();
-        ctx.moveTo(x * cellW, 0);
-        ctx.lineTo(x * cellW, canvas.height);
-        ctx.stroke();
+      if (layout.drawGridLines) {
+        // 1-device-pixel fillRect lines at exact cell edges — crisp at any zoom, unlike
+        // fractional-width strokes centered on integer coordinates.
+        for (let x = 0; x <= grid.width; x++) {
+          ctx.fillStyle = x % MAJOR_GRID_LINE_EVERY === 0 ? '#5a5a5a' : '#b8b8b8';
+          ctx.fillRect(Math.min(x * cellW, layout.canvasW - 1), 0, 1, layout.canvasH);
+        }
+        for (let y = 0; y <= grid.height; y++) {
+          ctx.fillStyle = y % MAJOR_GRID_LINE_EVERY === 0 ? '#5a5a5a' : '#b8b8b8';
+          ctx.fillRect(0, Math.min(y * cellH, layout.canvasH - 1), layout.canvasW, 1);
+        }
       }
-      for (let y = 0; y <= grid.height; y++) {
-        ctx.strokeStyle = y % MAJOR_GRID_LINE_EVERY === 0 ? '#5a5a5a' : '#a0a0a0';
-        ctx.lineWidth = y % MAJOR_GRID_LINE_EVERY === 0 ? 1 : 0.5;
-        ctx.beginPath();
-        ctx.moveTo(0, y * cellH);
-        ctx.lineTo(canvas.width, y * cellH);
-        ctx.stroke();
-      }
-    }
+    };
+
+    render();
+
+    // Re-render when the container resizes (mobile rotation, panel collapse, ...).
+    const observer =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => render()) : null;
+    if (observer && canvas.parentElement) observer.observe(canvas.parentElement);
+    return () => observer?.disconnect();
   }, [grid, gauge]);
 
   return (

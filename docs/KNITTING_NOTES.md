@@ -114,6 +114,14 @@ as speckle; lowering the max-color count cleans those up.
 - Nearest-color matching uses **CIE76 distance in L\*a\*b\* space** (perceptually more accurate
   than raw RGB distance, though CIE76 itself is a simplification — CIEDE2000 would be more
   accurate still and is a possible future improvement).
+- **Wool-color consolidation**: after median-cut, palette entries closer than **ΔE 10** (CIE76)
+  are merged into a single color (`packages/core/src/color/consolidate.ts`), weighted by how
+  many stitches each shade covers so the dominant shade wins. Median-cut on photographic
+  input otherwise splits one perceived color (a sky, a skin tone) into several near-identical
+  shades — colors no yarn shop distinguishes and no knitter wants to juggle. Merging is
+  transitive, so a chain of near shades collapses together; the final palette can therefore
+  come out _smaller_ than `maxColors`, which is correct: it reports the number of genuinely
+  distinct yarns the image needs.
 - Dithering (`none` / ordered "Bayer" / Floyd–Steinberg) is offered, but **`none` is the default
   and the recommendation for stranded/intarsia colorwork**: dithering scatters isolated single
   stitches of a color across the grid, which is impractical to knit as clean color regions.
