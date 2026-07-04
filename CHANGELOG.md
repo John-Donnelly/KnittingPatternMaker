@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Auto mode mangled pictures of existing charts.** A photo/scan of a chart _with grid
+  lines_ (e.g. a 508×664 JPEG of a 38×50 forest chart) was classified as a photo: average
+  sampling blended the grid lines into every cell and the ~10in default sizing (55×98) didn't
+  align with the chart's ~13px cell pitch, so output cells straddled chart cells — smeared
+  colors and spurious line artifacts. Auto mode now **detects the chart's own grid**
+  (deterministic per-axis edge-energy pitch/phase search, `auto/gridDetect.ts`) and converts
+  **one stitch per detected chart cell** with dominant sampling and a grid-aligned crop.
+  Verified on the real forest chart: 38×50 stitches, 4 clean wool colors, cell-for-cell
+  faithful to the source. 6 new tests (detection, false-positive rejection on photos/flat
+  art, auto integration, user-override precedence).
 - **Palettes offered several colors "one shade apart".** Median-cut on photographic input
   splits one perceived color into near-identical shades (measured on a real photo: four sky
   shades ΔE 4.5–9.4 apart at 120×120 / 8 colors) — impossible to buy as distinct yarns and the

@@ -15,6 +15,7 @@ import { sampleImage } from '../image/sample.js';
 import { quantizeGrid } from '../image/quantizeGrid.js';
 import { WOOL_SHADE_DELTA_E } from '../color/consolidate.js';
 import { analyzeImage, type ImageStats } from './imageStats.js';
+import { detectChartGrid, type ChartGridDetection } from './gridDetect.js';
 
 /**
  * Auto mode: fill in any pattern option the user left unset with a choice derived
@@ -119,25 +120,41 @@ export function resolveAutoOptions(
     );
   }
 
-  const sampling = provided.sampling ?? (stats.isFlatArt ? 'dominant' : 'average');
+  // A photo/scan/screenshot of an EXISTING chart (periodic grid lines) is converted one
+  // stitch per chart cell — resampling it at an unrelated stitch count would smear every
+  // output cell across chart-cell boundaries. Only probed when it could affect a default.
+  const chartGrid =
+    provided.widthStitches === undefined ||
+    provided.heightRows === undefined ||
+    provided.sampling === undefined ||
+    provided.crop === undefined
+      ? detectChartGrid(source)
+      : null;
+
+  const sampling = provided.sampling ?? (chartGrid || stats.isFlatArt ? 'dominant' : 'average');
   if (provided.sampling === undefined) {
     decide(
       'sampling',
       sampling,
-      stats.isFlatArt
-        ? 'The image reads as flat-color art, so dominant-color sampling keeps its colors crisp.'
-        : 'The image reads as a photo, so each stitch averages the pixels it covers.',
+      chartGrid
+        ? 'The image is a picture of an existing chart, so dominant-color sampling ignores its grid lines and recovers each cell’s flat color.'
+        : stats.isFlatArt
+          ? 'The image reads as flat-color art, so dominant-color sampling keeps its colors crisp.'
+          : 'The image reads as a photo, so each stitch averages the pixels it covers.',
     );
   }
 
   // The user's gauge (if any) is passed through; proportions math falls back to the default.
   const gaugeForMath = provided.gauge ?? DEFAULT_GAUGE;
 
-  const dims = autoDimensions(source, provided, stats, gaugeForMath, repeat, decide);
+  const dims = autoDimensions(source, provided, stats, gaugeForMath, repeat, chartGrid, decide);
 
-  // For pixel-art-sized sources mapped 1:1, the whole image *is* the chart — don't let the
-  // gauge-aspect suggested crop trim it.
-  const crop = provided.crop ?? (dims.native ? fullRect(source) : undefined);
+  // For chart pictures, crop to the detected grid span so sampling cells align with chart
+  // cells; for pixel-art-sized sources mapped 1:1, the whole image *is* the chart — don't
+  // let the gauge-aspect suggested crop trim either.
+  const crop =
+    provided.crop ??
+    (dims.fromChartGrid && chartGrid ? chartGrid.crop : dims.native ? fullRect(source) : undefined);
 
   const { technique, maxColors } = autoTechniqueAndColors(
     source,
@@ -203,6 +220,8 @@ interface AutoDimensions {
   heightRows: number;
   /** True when the source was small flat art mapped 1 stitch per source pixel. */
   native: boolean;
+  /** True when the dimensions came from a detected chart grid (1 stitch per chart cell). */
+  fromChartGrid: boolean;
 }
 
 function autoDimensions(
@@ -211,6 +230,7 @@ function autoDimensions(
   stats: ImageStats,
   gauge: GaugeSpec,
   repeat: RepeatSpec,
+  chartGrid: ChartGridDetection | null,
   decide: (field: string, value: string, reason: string) => void,
 ): AutoDimensions {
   const maxWidth = Math.max(1, Math.floor(MAX_GRID_DIMENSION / repeat.across));
@@ -221,6 +241,28 @@ function autoDimensions(
       widthStitches: provided.widthStitches,
       heightRows: provided.heightRows,
       native: false,
+      fromChartGrid: false,
+    };
+  }
+
+  // Picture of an existing chart: one stitch per detected chart cell.
+  if (
+    provided.widthStitches === undefined &&
+    provided.heightRows === undefined &&
+    chartGrid &&
+    chartGrid.cellsAcross <= maxWidth &&
+    chartGrid.cellsDown <= maxHeight
+  ) {
+    decide(
+      'size',
+      `${chartGrid.cellsAcross} x ${chartGrid.cellsDown}`,
+      'The image is a picture of an existing chart, so each of its cells becomes exactly one stitch.',
+    );
+    return {
+      widthStitches: chartGrid.cellsAcross,
+      heightRows: chartGrid.cellsDown,
+      native: false,
+      fromChartGrid: true,
     };
   }
 
@@ -240,7 +282,12 @@ function autoDimensions(
       `${source.width} x ${source.height}`,
       'The source is small flat-color art, so each source pixel becomes exactly one stitch.',
     );
-    return { widthStitches: source.width, heightRows: source.height, native: true };
+    return {
+      widthStitches: source.width,
+      heightRows: source.height,
+      native: true,
+      fromChartGrid: false,
+    };
   }
 
   // Aspect of the region that will be charted (the user's crop, or the whole image).
@@ -258,7 +305,12 @@ function autoDimensions(
       `${provided.widthStitches} x ${heightRows}`,
       'Rows chosen so the knitted result keeps the image proportions at your stitch width.',
     );
-    return { widthStitches: provided.widthStitches, heightRows, native: false };
+    return {
+      widthStitches: provided.widthStitches,
+      heightRows,
+      native: false,
+      fromChartGrid: false,
+    };
   }
   if (provided.heightRows !== undefined) {
     const widthStitches = clampW((provided.heightRows * sourceAspect) / cellAspect);
@@ -267,7 +319,7 @@ function autoDimensions(
       `${widthStitches} x ${provided.heightRows}`,
       'Stitch width chosen so the knitted result keeps the image proportions at your row count.',
     );
-    return { widthStitches, heightRows: provided.heightRows, native: false };
+    return { widthStitches, heightRows: provided.heightRows, native: false, fromChartGrid: false };
   }
 
   // Aim for a ~10in-wide finished panel at the working gauge (popular chart tools default to
@@ -279,7 +331,7 @@ function autoDimensions(
     `${widthStitches} x ${heightRows}`,
     `Sized for a roughly ${AUTO_TARGET_FINISHED_WIDTH_IN}in-wide finished panel at the working gauge, keeping the image's proportions once knitted.`,
   );
-  return { widthStitches, heightRows, native: false };
+  return { widthStitches, heightRows, native: false, fromChartGrid: false };
 }
 
 /** Distinct palette colors per chart row, and color runs (yarn ends) per row. */

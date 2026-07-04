@@ -205,6 +205,13 @@ human-readable reason. The defaults encode published colorwork conventions:
   stitches at the default 22 sts/4 in), with rows derived from the image's aspect ratio
   corrected for non-square stitches. Small flat-color sources (≤ 120 px per side) are instead
   mapped **1 stitch per pixel**, so existing pixel art comes through exactly.
+- **Pictures of existing charts.** If the image has strong periodic vertical + horizontal
+  edges — a photo/scan/screenshot of a knitting or cross-stitch chart _with its grid lines_ —
+  the grid pitch is detected (`packages/core/src/auto/gridDetect.ts`: per-axis edge-energy
+  profiles searched over pitch/phase, requiring a line at ≥80% of positions so a lone content
+  edge can't false-positive) and the chart is converted **one stitch per detected cell** with
+  dominant sampling and a grid-aligned crop. Resampling such an image at an unrelated stitch
+  count would smear every output cell across chart-cell boundaries.
 - **Sampling.** Flat-color art (few significant colors, hardly any soft pixel-to-pixel
   transitions on a probe grid) gets **dominant** sampling; photographic content gets
   **average**. See "Sampling" above.
