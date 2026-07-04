@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Configurable shade grouping** — the wool-color merge threshold is now an option end to end:
+  `shadeMergeDeltaE` on `POST /api/pattern` (0–50; 0 keeps every shade; unset uses the ΔE 10
+  default) and a "Shade grouping" slider in the UI's custom controls, echoed back in
+  `resolvedOptions`. Auto mode's technique evaluation uses the same threshold so what it
+  measures matches what gets generated.
 - **Landing page** at `/` (hero, feature overview, how-it-works) with the pattern maker moved
   to `/app` (tiny history-API router — share links keep working from any path). The header
   shows sign-in/sign-out state when SSO is configured.

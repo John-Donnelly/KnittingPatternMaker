@@ -13,6 +13,7 @@ function baseForm(overrides: Partial<FormState> = {}): FormState {
     stitchesPer4In: 22,
     rowsPer4In: 30,
     maxColors: 8,
+    shadeMergeDeltaE: 10,
     dither: 'none',
     sampling: 'average',
     cropMode: 'auto',
@@ -120,6 +121,20 @@ describe('ControlsPanel', () => {
     fireEvent.change(screen.getByLabelText('Repeat across'), { target: { value: '3' } });
 
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ repeatAcross: 3 }));
+  });
+
+  it('shows the shade-grouping slider with an off state at 0', () => {
+    render(<ControlsPanel value={baseForm({ shadeMergeDeltaE: 0 })} onChange={() => {}} />);
+    expect(screen.getByText(/shade grouping: off/i)).toBeInTheDocument();
+  });
+
+  it('updates the shade-grouping threshold via the slider', () => {
+    const onChange = vi.fn();
+    render(<ControlsPanel value={baseForm()} onChange={onChange} />);
+
+    fireEvent.change(screen.getByLabelText(/shade grouping/i), { target: { value: '18' } });
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ shadeMergeDeltaE: 18 }));
   });
 
   it('changes the sampling mode via the select', async () => {

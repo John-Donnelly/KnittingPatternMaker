@@ -334,6 +334,22 @@ describe('POST /api/pattern', () => {
     expect(decidedFields).not.toContain('maxColors');
   });
 
+  it('honors shadeMergeDeltaE: 0 (keep every shade) and echoes the resolved value', async () => {
+    const image = await makeColorBandsPng(120, 90);
+    const off = await request(app.server)
+      .post('/api/pattern')
+      .field('options', JSON.stringify({ technique: 'intarsia', shadeMergeDeltaE: 0 }))
+      .attach('image', image, 'art.png');
+    expect(off.status).toBe(200);
+    expect(off.body.resolvedOptions.shadeMergeDeltaE).toBe(0);
+
+    const defaulted = await request(app.server)
+      .post('/api/pattern')
+      .field('options', JSON.stringify({ technique: 'intarsia' }))
+      .attach('image', image, 'art.png');
+    expect(defaulted.body.resolvedOptions.shadeMergeDeltaE).toBe(10);
+  });
+
   it('rejects missing image', async () => {
     const res = await request(app.server)
       .post('/api/pattern')

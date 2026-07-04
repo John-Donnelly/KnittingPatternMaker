@@ -104,6 +104,35 @@ describe('quantizeGrid wool-color consolidation', () => {
     }
   });
 
+  it('shadeMergeDeltaE: 0 disables merging; a custom threshold widens it', () => {
+    // Two shades ~deltaE 5 apart, in equal amounts.
+    const A = { r: 169, g: 201, b: 193 };
+    const B = { r: 177, g: 207, b: 190 };
+    const samples: RGB[] = [];
+    for (let i = 0; i < 100; i++) samples.push(i % 2 === 0 ? A : B);
+
+    const off = quantizeGrid(samples, 10, 10, {
+      maxColors: 4,
+      dither: 'none',
+      shadeMergeDeltaE: 0,
+    });
+    expect(off.palette).toHaveLength(2);
+
+    const defaulted = quantizeGrid(samples, 10, 10, { maxColors: 4, dither: 'none' });
+    expect(defaulted.palette).toHaveLength(1);
+
+    // Distinctly different grays (~deltaE 17 apart) survive the default but merge at 25.
+    const C = { r: 100, g: 100, b: 100 };
+    const D = { r: 140, g: 140, b: 140 };
+    const grays: RGB[] = [];
+    for (let i = 0; i < 100; i++) grays.push(i % 2 === 0 ? C : D);
+    expect(quantizeGrid(grays, 10, 10, { maxColors: 4, dither: 'none' }).palette.length).toBe(2);
+    expect(
+      quantizeGrid(grays, 10, 10, { maxColors: 4, dither: 'none', shadeMergeDeltaE: 25 }).palette
+        .length,
+    ).toBe(1);
+  });
+
   it('keeps genuinely distinct flat colors intact', () => {
     const samples: RGB[] = [];
     const RED = { r: 200, g: 30, b: 30 };

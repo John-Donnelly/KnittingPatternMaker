@@ -1,6 +1,6 @@
 import type { Grid, QuantizeOptions, RGB } from '../types.js';
 import { medianCutPalette } from '../color/quantize.js';
-import { consolidatePalette } from '../color/consolidate.js';
+import { consolidatePalette, WOOL_SHADE_DELTA_E } from '../color/consolidate.js';
 import { nearestColorIndex } from '../color/nearest.js';
 import { ditherBayer4, ditherFloydSteinberg } from './dither.js';
 
@@ -27,14 +27,16 @@ export function quantizeGrid(
 
   // Weight each raw palette entry by how many cells it actually wins, so the merged wool
   // color is dominated by the shade that covers the most fabric.
-  const counts = new Array<number>(rawPalette.length).fill(0);
-  if (rawPalette.length > 1) {
+  const mergeDeltaE = options.shadeMergeDeltaE ?? WOOL_SHADE_DELTA_E;
+  let palette: RGB[] = rawPalette;
+  if (mergeDeltaE > 0 && rawPalette.length > 1) {
+    const counts = new Array<number>(rawPalette.length).fill(0);
     for (const sample of samples) {
       const idx = nearestColorIndex(sample, rawPalette);
       counts[idx] = (counts[idx] ?? 0) + 1;
     }
+    palette = consolidatePalette(rawPalette, counts, mergeDeltaE).palette;
   }
-  const { palette } = consolidatePalette(rawPalette, counts);
 
   let indices: Uint16Array;
   switch (options.dither) {

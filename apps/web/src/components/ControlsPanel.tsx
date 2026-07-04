@@ -1,6 +1,7 @@
 import {
   MAX_COLORS,
   MAX_GRID_DIMENSION,
+  WOOL_SHADE_DELTA_E,
   type AutoDecision,
   type DitherMode,
   type SamplingMode,
@@ -18,6 +19,8 @@ export interface FormState {
   stitchesPer4In: number;
   rowsPer4In: number;
   maxColors: number;
+  /** Wool-color grouping threshold (CIE76 delta-E); 0 keeps every shade. */
+  shadeMergeDeltaE: number;
   dither: DitherMode;
   sampling: SamplingMode;
   cropMode: 'auto' | 'full';
@@ -190,16 +193,40 @@ function CustomControls({
       )}
 
       {value.technique !== 'texture' && (
-        <label className="field">
-          <span>Max colors: {value.maxColors}</span>
-          <input
-            type="range"
-            min={2}
-            max={MAX_COLORS}
-            value={value.maxColors}
-            onChange={(e) => set('maxColors', Number(e.target.value))}
-          />
-        </label>
+        <>
+          <label className="field">
+            <span>Max colors: {value.maxColors}</span>
+            <input
+              type="range"
+              min={2}
+              max={MAX_COLORS}
+              value={value.maxColors}
+              onChange={(e) => set('maxColors', Number(e.target.value))}
+            />
+          </label>
+
+          <label className="field">
+            <span>
+              Shade grouping:{' '}
+              {value.shadeMergeDeltaE === 0
+                ? 'off (keep every shade)'
+                : `ΔE ${value.shadeMergeDeltaE}`}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={25}
+              value={value.shadeMergeDeltaE}
+              aria-describedby="shade-merge-hint"
+              onChange={(e) => set('shadeMergeDeltaE', Number(e.target.value))}
+            />
+          </label>
+          <span id="shade-merge-hint" className="field__hint">
+            Merges palette colors closer than this perceptual distance into one wool color, so you
+            never get shades too similar to buy as separate yarns. Default ΔE {WOOL_SHADE_DELTA_E};
+            raise it to group more aggressively, 0 to keep every shade.
+          </span>
+        </>
       )}
 
       <label className="field">

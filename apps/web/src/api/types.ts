@@ -26,6 +26,8 @@ export interface PatternOptions {
   crop?: CropRect;
   seamless?: SeamlessMode;
   repeat?: RepeatSpec;
+  /** Wool-color grouping threshold (CIE76 delta-E); 0 keeps every shade. */
+  shadeMergeDeltaE?: number;
 }
 
 export interface PatternResponse {

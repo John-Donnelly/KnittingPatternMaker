@@ -121,7 +121,9 @@ as speckle; lowering the max-color count cleans those up.
   shades — colors no yarn shop distinguishes and no knitter wants to juggle. Merging is
   transitive, so a chain of near shades collapses together; the final palette can therefore
   come out _smaller_ than `maxColors`, which is correct: it reports the number of genuinely
-  distinct yarns the image needs.
+  distinct yarns the image needs. The threshold is configurable (`shadeMergeDeltaE` in the API,
+  the "Shade grouping" slider in the UI): raise it to group more aggressively, set 0 to keep
+  every shade.
 - Dithering (`none` / ordered "Bayer" / Floyd–Steinberg) is offered, but **`none` is the default
   and the recommendation for stranded/intarsia colorwork**: dithering scatters isolated single
   stitches of a color across the grid, which is impractical to knit as clean color regions.

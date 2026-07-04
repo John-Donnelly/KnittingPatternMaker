@@ -13,6 +13,7 @@ import { MAX_GRID_DIMENSION } from '../limits.js';
 import { DEFAULT_GAUGE, stitchAspectRatio, suggestedCropRect } from '../image/gauge.js';
 import { sampleImage } from '../image/sample.js';
 import { quantizeGrid } from '../image/quantizeGrid.js';
+import { WOOL_SHADE_DELTA_E } from '../color/consolidate.js';
 import { analyzeImage, type ImageStats } from './imageStats.js';
 
 /**
@@ -43,6 +44,8 @@ export interface AutoPatternRequest {
   crop?: CropRect | undefined;
   seamless?: SeamlessMode | undefined;
   repeat?: RepeatSpec | undefined;
+  /** Wool-color grouping threshold (CIE76 delta-E); 0 keeps every shade. */
+  shadeMergeDeltaE?: number | undefined;
 }
 
 /** The concrete options auto mode resolved to (crop/gauge stay optional: unset means
@@ -58,6 +61,8 @@ export interface ResolvedPatternOptions {
   crop?: CropRect;
   seamless: SeamlessMode;
   repeat: RepeatSpec;
+  /** Wool-color grouping threshold actually used (CIE76 delta-E); 0 = disabled. */
+  shadeMergeDeltaE: number;
 }
 
 /** One auto-mode choice, with a human-readable reason (shown in the UI). */
@@ -171,6 +176,7 @@ export function resolveAutoOptions(
       sampling,
       seamless,
       repeat,
+      shadeMergeDeltaE: provided.shadeMergeDeltaE ?? WOOL_SHADE_DELTA_E,
       ...(provided.gauge ? { gauge: provided.gauge } : {}),
       ...(crop ? { crop } : {}),
     },
@@ -353,6 +359,7 @@ function autoTechniqueAndColors(
   const evalGrid = quantizeGrid(samples, dims.widthStitches, dims.heightRows, {
     maxColors: evalColors,
     dither: 'none',
+    shadeMergeDeltaE: provided.shadeMergeDeltaE ?? WOOL_SHADE_DELTA_E,
   });
   const { busyRowFraction, maxRunsPerRow } = rowComplexity(evalGrid);
 

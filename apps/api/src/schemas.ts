@@ -54,6 +54,9 @@ export const PatternOptionsSchema = z
     crop: CropRectSchema.optional(),
     /** Which axes to blend so a repeated motif loops with no visible seam. */
     seamless: SeamlessModeSchema.optional(),
+    /** Wool-color grouping: palette entries closer than this CIE76 delta-E merge into one
+     * color. 0 keeps every shade; unset uses the default (see docs/KNITTING_NOTES.md). */
+    shadeMergeDeltaE: z.number().min(0).max(50).optional(),
     /** How many times to tile the motif into the final chart (1x1 = a single motif). */
     repeat: RepeatSpecSchema.optional(),
   })

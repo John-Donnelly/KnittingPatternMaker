@@ -117,6 +117,7 @@ export async function runPipeline(
       : quantizeGrid(samples, options.widthStitches, options.heightRows, {
           maxColors: options.maxColors,
           dither: options.dither,
+          shadeMergeDeltaE: options.shadeMergeDeltaE,
         });
 
   // Materialize the repeat: tile the quantized motif into the final chart.

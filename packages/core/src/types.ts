@@ -53,6 +53,11 @@ export interface QuantizeOptions {
   /** Maximum number of distinct colors in the resulting palette (>= 1). */
   maxColors: number;
   dither: DitherMode;
+  /**
+   * Palette entries closer than this CIE76 delta-E merge into one "wool color"
+   * (see color/consolidate.ts). Defaults to WOOL_SHADE_DELTA_E; 0 keeps every shade.
+   */
+  shadeMergeDeltaE?: number | undefined;
 }
 
 /**
