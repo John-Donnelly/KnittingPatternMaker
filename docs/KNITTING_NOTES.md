@@ -205,13 +205,25 @@ human-readable reason. The defaults encode published colorwork conventions:
   stitches at the default 22 sts/4 in), with rows derived from the image's aspect ratio
   corrected for non-square stitches. Small flat-color sources (≤ 120 px per side) are instead
   mapped **1 stitch per pixel**, so existing pixel art comes through exactly.
-- **Pictures of existing charts.** If the image has strong periodic vertical + horizontal
-  edges — a photo/scan/screenshot of a knitting or cross-stitch chart _with its grid lines_ —
-  the grid pitch is detected (`packages/core/src/auto/gridDetect.ts`: per-axis edge-energy
-  profiles searched over pitch/phase, requiring a line at ≥80% of positions so a lone content
-  edge can't false-positive) and the chart is converted **one stitch per detected cell** with
-  dominant sampling and a grid-aligned crop. Resampling such an image at an unrelated stitch
-  count would smear every output cell across chart-cell boundaries.
+- **Pictures of pixel grids.** Two deterministic detectors (`packages/core/src/auto/gridDetect.ts`)
+  recognize images that are pictures OF a cell grid and convert them **one stitch per
+  underlying cell** (resampling at an unrelated stitch count would smear every output cell
+  across cell boundaries):
+  - _Grid-line charts_ (photo/scan/screenshot of a knitting or cross-stitch chart with
+    visible grid lines): edge peaks are chained by consistent spacing; the pitch comes from
+    the chain endpoints, so it cannot drift across large scans, and margins outside the
+    chart are cropped away. Verified on a real 508×664 chart JPEG (38×50 cells) and a
+    1722×1067 filet-crochet chart (42×26 cells).
+  - _Upscaled pixel art_ (no grid lines): if every color edge sits on multiples of one
+    art-pixel size, the native art dimensions are recovered (verified on 512² and 1216²
+    CC0 sprites → 64×64 / 32×32 stitches). Flat-color images try this test first; a clean
+    gridded chart passes it with the same answer.
+  - _Known limitation (deliberate)_: heavily aged or hand-painted archival scans (tested on
+    three 4096px 19th-century Berlin wool work sheets) have grids too faint/warped for
+    either detector — and an autocorrelation fallback was evaluated and **rejected** because
+    JPEG 8×8 block artifacts produce equally strong periodicity in ordinary photos, risking
+    confidently wrong cell counts. Such scans fall back to photo treatment; set the
+    width/height to the chart's true cell count manually for a 1:1 conversion.
 - **Sampling.** Flat-color art (few significant colors, hardly any soft pixel-to-pixel
   transitions on a probe grid) gets **dominant** sampling; photographic content gets
   **average**. See "Sampling" above.

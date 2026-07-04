@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectChartGrid } from '../src/auto/gridDetect.js';
+import { detectChartGrid, detectPixelLattice } from '../src/auto/gridDetect.js';
 import { resolveAutoOptions } from '../src/auto/autoSettings.js';
 import type { PixelBuffer } from '../src/types.js';
 
@@ -64,6 +64,55 @@ describe('detectChartGrid', () => {
   it('is deterministic', () => {
     const chart = griddedChart(16, 16, 10);
     expect(detectChartGrid(chart)).toEqual(detectChartGrid(chart));
+  });
+});
+
+/** Integer-upscaled pixel art: a 10x8 multi-color motif blown up by `scale`, no grid lines. */
+function upscaledArt(scale: number): PixelBuffer {
+  const artW = 10;
+  const artH = 8;
+  const colors: [number, number, number][] = [
+    [200, 30, 30],
+    [30, 60, 200],
+    [30, 160, 60],
+    [245, 245, 245],
+  ];
+  return makeBuffer(artW * scale, artH * scale, (x, y) => {
+    const ax = Math.floor(x / scale);
+    const ay = Math.floor(y / scale);
+    // Deterministic multi-color pattern with edges on many (not all) art-pixel boundaries.
+    return colors[(ax * 3 + ay * 5 + Math.floor(ax / 2)) % colors.length] ?? [0, 0, 0];
+  });
+}
+
+describe('detectPixelLattice', () => {
+  it('recovers the native art dimensions of integer-upscaled pixel art', () => {
+    const detection = detectPixelLattice(upscaledArt(24));
+    expect(detection).toEqual({ cellsAcross: 10, cellsDown: 8 });
+  });
+
+  it('returns null for a smooth photo-like gradient (edges never align to one lattice)', () => {
+    const photo = makeBuffer(240, 240, (x, y) => [
+      Math.round((x / 239) * 255),
+      Math.round((y / 239) * 255),
+      128,
+    ]);
+    expect(detectPixelLattice(photo)).toBeNull();
+  });
+
+  it('is deterministic', () => {
+    const art = upscaledArt(16);
+    expect(detectPixelLattice(art)).toEqual(detectPixelLattice(art));
+  });
+});
+
+describe('auto mode on upscaled pixel art', () => {
+  it('maps one stitch per underlying art pixel', () => {
+    const { options, decisions } = resolveAutoOptions(upscaledArt(24), {});
+    expect(options.widthStitches).toBe(10);
+    expect(options.heightRows).toBe(8);
+    expect(options.sampling).toBe('dominant');
+    expect(decisions.some((d) => d.reason.includes('upscaled pixel art'))).toBe(true);
   });
 });
 

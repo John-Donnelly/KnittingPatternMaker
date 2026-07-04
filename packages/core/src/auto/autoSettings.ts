@@ -15,7 +15,7 @@ import { sampleImage } from '../image/sample.js';
 import { quantizeGrid } from '../image/quantizeGrid.js';
 import { WOOL_SHADE_DELTA_E } from '../color/consolidate.js';
 import { analyzeImage, type ImageStats } from './imageStats.js';
-import { detectChartGrid, type ChartGridDetection } from './gridDetect.js';
+import { detectChartGrid, detectPixelLattice, type ChartGridDetection } from './gridDetect.js';
 
 /**
  * Auto mode: fill in any pattern option the user left unset with a choice derived
@@ -120,16 +120,30 @@ export function resolveAutoOptions(
     );
   }
 
-  // A photo/scan/screenshot of an EXISTING chart (periodic grid lines) is converted one
-  // stitch per chart cell — resampling it at an unrelated stitch count would smear every
-  // output cell across chart-cell boundaries. Only probed when it could affect a default.
-  const chartGrid =
+  // A picture OF a pixel grid is converted one stitch per underlying cell — resampling it at
+  // an unrelated stitch count would smear every output cell across cell boundaries. Two
+  // detectors (see gridDetect.ts): the edge-lattice test for flat-color art (upscaled pixel
+  // art, clean chart screenshots), and the grid-line chain detector for photos/scans of
+  // charts. Flat art tries the lattice first — the chain detector can misread sparse
+  // pixel-art boundaries as a coarser grid, while a genuinely gridded flat image passes the
+  // lattice test with the same answer. Known limitation, deliberate: heavily aged/hand-
+  // painted archival scans whose grids are too faint/warped for either detector fall back to
+  // photo treatment rather than risking a confidently wrong cell count.
+  const detectWanted =
     provided.widthStitches === undefined ||
     provided.heightRows === undefined ||
     provided.sampling === undefined ||
-    provided.crop === undefined
-      ? detectChartGrid(source)
-      : null;
+    provided.crop === undefined;
+  let lattice: ReturnType<typeof detectPixelLattice> = null;
+  let chartGrid: ChartGridDetection | null = null;
+  if (detectWanted) {
+    if (stats.isFlatArt) {
+      lattice = detectPixelLattice(source);
+      if (!lattice) chartGrid = detectChartGrid(source);
+    } else {
+      chartGrid = detectChartGrid(source);
+    }
+  }
 
   const sampling = provided.sampling ?? (chartGrid || stats.isFlatArt ? 'dominant' : 'average');
   if (provided.sampling === undefined) {
@@ -147,7 +161,16 @@ export function resolveAutoOptions(
   // The user's gauge (if any) is passed through; proportions math falls back to the default.
   const gaugeForMath = provided.gauge ?? DEFAULT_GAUGE;
 
-  const dims = autoDimensions(source, provided, stats, gaugeForMath, repeat, chartGrid, decide);
+  const dims = autoDimensions(
+    source,
+    provided,
+    stats,
+    gaugeForMath,
+    repeat,
+    chartGrid,
+    lattice,
+    decide,
+  );
 
   // For chart pictures, crop to the detected grid span so sampling cells align with chart
   // cells; for pixel-art-sized sources mapped 1:1, the whole image *is* the chart — don't
@@ -231,6 +254,7 @@ function autoDimensions(
   gauge: GaugeSpec,
   repeat: RepeatSpec,
   chartGrid: ChartGridDetection | null,
+  lattice: ReturnType<typeof detectPixelLattice>,
   decide: (field: string, value: string, reason: string) => void,
 ): AutoDimensions {
   const maxWidth = Math.max(1, Math.floor(MAX_GRID_DIMENSION / repeat.across));
@@ -285,6 +309,29 @@ function autoDimensions(
     return {
       widthStitches: source.width,
       heightRows: source.height,
+      native: true,
+      fromChartGrid: false,
+    };
+  }
+
+  // Larger flat-color art that is integer-UPSCALED pixel art (every color edge sits on a
+  // common lattice): map one stitch per underlying art pixel, not per screen pixel.
+  if (
+    provided.widthStitches === undefined &&
+    provided.heightRows === undefined &&
+    lattice &&
+    lattice.cellsAcross <= maxWidth &&
+    lattice.cellsDown <= maxHeight &&
+    (lattice.cellsAcross < source.width || lattice.cellsDown < source.height)
+  ) {
+    decide(
+      'size',
+      `${lattice.cellsAcross} x ${lattice.cellsDown}`,
+      'The source is upscaled pixel art, so each underlying art pixel becomes exactly one stitch.',
+    );
+    return {
+      widthStitches: lattice.cellsAcross,
+      heightRows: lattice.cellsDown,
       native: true,
       fromChartGrid: false,
     };
