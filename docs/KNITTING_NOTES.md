@@ -105,12 +105,38 @@ its vote split — but the subsequent palette quantization absorbs that rare cas
 heavily, a few isolated stitches of a dark/saturated source color can still win their cell and read
 as speckle; lowering the max-color count cleans those up.
 
+Averaging happens in **gamma-encoded sRGB space on purpose**. Averaging in linear light is
+physically more correct for simulating optics, but it was measured to be perceptually _worse_
+here: on a multi-image evaluation set (pixel art, chart scans, photos), linear-light box
+averaging increased the mean CIE76 ΔE between the sampled grid and the source on 5 of 7
+images (worst case a black-on-white chart, 13.4 → 17.5, because linear averaging biases
+dark/light mixes toward the light side and washes out dark line work). sRGB-space averaging
+tracks Lab lightness and keeps mixes visually centered.
+
 ## Color quantization
 
 - Colors are reduced via **median-cut**, splitting each box at the **largest gap between
   sorted color values** (not the middle index) so that genuinely separated colors — e.g. the
   two colors of a flag or logo — don't get averaged into a color that doesn't exist in the
   source image. See `packages/core/src/color/quantize.ts`.
+- The raw median-cut palette then passes through a deterministic **adaptive refinement**
+  (`packages/core/src/color/refine.ts`) fixing median-cut's two systematic failures, both
+  measured on real test images:
+  - **Phantom blends**: anti-aliased edges and box-averaged cells produce colors _between_
+    the real flat colors, and median-cut boxes can average them into palette entries that
+    appear nowhere in the source (measured up to ~20 ΔE off — two black birds and a brown
+    bird merging into one muddy dark-brown while a light-gray bird vanished into the sky).
+    Refinement reassigns samples to their nearest entry, recenters each entry, and **snaps
+    an entry to the exact color that dominates its cluster** (≥ 50% of stitches), so flat
+    art gets its true colors back while photo gradients keep the mean.
+  - **Wasted slots**: entries 1–2 ΔE apart get merged, sub-0.5%-coverage entries that can be
+    reabsorbed nearby get pruned, and every freed slot is re-spent splitting the cluster
+    with the largest weighted error. A full palette may also **swap** out an entry that is
+    merely a mixture of two other entries (an edge-blend artifact, never a distinct accent)
+    for a higher-gain split.
+  - Small-but-important **accent colors survive by construction** (a 1-stitch beak
+    reassigns only at a large ΔE, blocking the prune; an accent is never a blend of two
+    other entries, blocking the swap) — verified on a 32×32 sprite at maxColors 8.
 - Nearest-color matching uses **CIE76 distance in L\*a\*b\* space** (perceptually more accurate
   than raw RGB distance, though CIE76 itself is a simplification — CIEDE2000 would be more
   accurate still and is a possible future improvement).

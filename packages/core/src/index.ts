@@ -6,6 +6,7 @@ export { MAX_GRID_DIMENSION, MAX_COLORS, MAX_SHARE_LINK_LENGTH } from './limits.
 export { rgbToLab, labDistanceSq, relativeLuminance } from './color/lab.js';
 export type { Lab } from './color/lab.js';
 export { medianCutPalette } from './color/quantize.js';
+export { adaptivePalette } from './color/refine.js';
 export { consolidatePalette, WOOL_SHADE_DELTA_E } from './color/consolidate.js';
 export type { ConsolidatedPalette } from './color/consolidate.js';
 export { nearestColorIndex } from './color/nearest.js';

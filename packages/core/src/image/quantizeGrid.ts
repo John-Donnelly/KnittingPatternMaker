@@ -1,15 +1,21 @@
 import type { Grid, QuantizeOptions, RGB } from '../types.js';
-import { medianCutPalette } from '../color/quantize.js';
+import { adaptivePalette } from '../color/refine.js';
 import { consolidatePalette, WOOL_SHADE_DELTA_E } from '../color/consolidate.js';
 import { nearestColorIndex } from '../color/nearest.js';
 import { ditherBayer4, ditherFloydSteinberg } from './dither.js';
 
 /**
- * Builds a deterministic palette (median-cut, from the true un-dithered colors), merges
- * perceptually-identical entries into single "wool colors" (see consolidatePalette — median
- * cut on photographic input otherwise splits one perceived color into several near-identical
- * shades no yarn shop distinguishes), and maps every sample to a palette index using the
- * requested dither mode.
+ * Builds a deterministic palette and maps every sample to a palette index using the
+ * requested dither mode. Two refinement stages run after median-cut, in order:
+ *
+ * 1. Adaptive refinement (`color/refine.ts`): fixes median-cut's systematic failures —
+ *    phantom blend colors that appear nowhere in the source, and wasted near-duplicate
+ *    slots — while preserving small high-contrast accents (see docs/KNITTING_NOTES.md).
+ * 2. Wool-shade consolidation (`color/consolidate.ts`): merges entries closer than the
+ *    user-tunable `shadeMergeDeltaE` (default 10) into single wool colors.
+ *
+ * Both stages may shrink the palette below `maxColors` — intentional: it reports how many
+ * genuinely distinct yarns the image needs.
  */
 export function quantizeGrid(
   samples: readonly RGB[],
@@ -23,7 +29,7 @@ export function quantizeGrid(
     );
   }
 
-  const rawPalette = medianCutPalette(samples, options.maxColors);
+  const rawPalette = adaptivePalette(samples, options.maxColors);
 
   // Weight each raw palette entry by how many cells it actually wins, so the merged wool
   // color is dominated by the shade that covers the most fabric.

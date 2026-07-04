@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Adaptive palette refinement — representative pixel art, only relevant colors.**
+  Median-cut's two systematic failures were measured on real images (32×32 sprite at 8
+  colors, averaged sampling: mean ΔE 13.7 vs source with 3 "phantom" palette entries that
+  appear nowhere in the image; at 24×24, 7 of 8 entries were phantoms): `adaptivePalette`
+  (`packages/core/src/color/refine.ts`) now post-refines every palette — reassign/recenter,
+  snap entries to the exact dominant color of their cluster (flat art gets its true colors
+  back; photo gradients keep means), merge ΔE<4 twins, prune negligible reabsorbable
+  entries, re-spend freed slots on the worst cluster, and swap out mixture-of-two-entries
+  artifacts for higher-gain splits. Accents survive by construction (1-stitch beaks and
+  0.78%-coverage eye patches verified kept at full palettes). Bird sprite: ΔE 13.7 → 5.6,
+  phantoms 3 → 0; a black/white chart asked for 4 colors now correctly yields 2. Linear-light
+  averaging was evaluated and **rejected** by measurement (worse on 5 of 7 images; rationale
+  in docs/KNITTING_NOTES.md). Runs before the wool-shade consolidation. 12 new tests.
+- **Color fidelity for flat art in auto mode.** Busy flat-color art (sprite sheets) no longer
+  falls into the busy-photo "stranded, 5 colors" fallback — which made a light-gray seagull
+  dissolve into a sky-blue background entirely. Flat art keeps up to 10 colors in every
+  technique branch, falling back to intarsia (high bobbin count warned) rather than losing
+  part of the design.
 - **Saved patterns + accounts.** Signing in gives each user a pattern library backed by
   SQLite (`DATA_DIR`, `apps/api/src/db.ts`): **Save pattern** stores the self-contained
   share-spec token; **My patterns** lists/opens/deletes (session-gated `/api/patterns` CRUD,
