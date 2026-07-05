@@ -15,3 +15,6 @@ npm-debug.log*
 .claude/scheduled_tasks.lock
 .claude/worktrees/
 data/
+
+# wrangler local state (contains machine-specific data - never commit)
+.wrangler/
