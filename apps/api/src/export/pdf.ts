@@ -126,7 +126,7 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): 
 
 // --- Chart rendering -------------------------------------------------------
 
-const CHART_HEADER_H = 20;
+const CHART_HEADER_H = 34;
 const COL_LABEL_H = 14;
 const ROW_LABEL_W = 26;
 const MIN_TILE_CELL_PT = 9;
@@ -141,10 +141,53 @@ const MIN_SYMBOL_CELL_PT = 7;
  * chart practice: the background/first color stays blank; distinct high-contrast glyphs for
  * the rest. WinAnsi-safe characters only (Helvetica).
  */
-const COLOR_SYMBOLS = ['', 'x', 'o', '/', '+', '-', 'V', '=', 'T', 'L', 'n', 'u', 's', 'z'];
+const COLOR_SYMBOLS = [
+  '',
+  'x',
+  'o',
+  '/',
+  '+',
+  '-',
+  'V',
+  '=',
+  'T',
+  'L',
+  'n',
+  'u',
+  's',
+  'z',
+  '*',
+  '#',
+  '<',
+  '>',
+  '?',
+  '%',
+  'A',
+  'b',
+  'c',
+  'e',
+  'F',
+  'g',
+  'H',
+  'k',
+  'm',
+  'P',
+  'q',
+  'r',
+  'w',
+  'y',
+  '3',
+  '4',
+  '7',
+  '9',
+  '&',
+  '@',
+];
 
 export function colorSymbol(paletteIndex: number): string {
-  return COLOR_SYMBOLS[paletteIndex % COLOR_SYMBOLS.length] ?? '';
+  // Covers MAX_COLORS (40) with distinct glyphs; beyond that (impossible via the API's
+  // validation) fall back to blank rather than duplicating another color's symbol.
+  return COLOR_SYMBOLS[paletteIndex] ?? '';
 }
 
 /** Black or white, whichever contrasts with the cell color (WCAG-ish midpoint on luminance). */
@@ -172,14 +215,22 @@ function drawChart(
   const singlePageFits = fitByHeight >= MIN_SINGLE_PAGE_CELL_PT;
 
   const cellH = singlePageFits ? Math.min(fitByHeight, MAX_CELL_PT) : MIN_TILE_CELL_PT;
-  const cellW = Math.max(1, Math.round(cellH * aspect));
+  // FLOOR, not round: rounding the width up could make grid.width * cellW exceed the page
+  // even though the "fits on one page" decision above said yes — producing an unexplained
+  // second page holding a single orphan column (seen at 35 sts x default gauge).
+  const cellW = Math.max(
+    1,
+    singlePageFits ? Math.floor(cellH * aspect) : Math.round(cellH * aspect),
+  );
 
   const tileCols = Math.max(1, Math.floor(availableW / cellW));
   const tileRows = Math.max(1, Math.floor(availableH / cellH));
   const pagesAcross = Math.ceil(grid.width / tileCols);
   const pagesDown = Math.ceil(grid.height / tileRows);
 
-  if (!singlePageFits) {
+  // Explain the split whenever a split ACTUALLY happens (derived from the real page counts,
+  // not the pre-rounding fit estimate).
+  if (pagesAcross * pagesDown > 1) {
     writer.paragraph(
       `The chart is split across ${pagesAcross * pagesDown} pages (${pagesAcross} across x ${pagesDown} down) to stay legible. Stitch and row numbers on every page show where each piece sits in the full chart.`,
       { color: MUTED, size: 9.5 },
@@ -391,7 +442,9 @@ function drawHowToRead(writer: PdfWriter, technique: Technique): void {
     );
   }
   lines.push(
-    'To work in the round instead: read every chart row right-to-left and knit every round (no WS rows).',
+    technique === 'texture'
+      ? 'To work in the round instead: read every chart row right-to-left, and work dark squares as purl, light squares as knit, on every round.'
+      : 'To work in the round instead: read every chart row right-to-left and knit every round (no WS rows).',
   );
   for (const line of lines) {
     writer.paragraph(`•  ${line}`, { size: 9.5 });
@@ -502,11 +555,22 @@ const TECHNIQUE_LABEL: Record<Technique, string> = {
   texture: 'Knit/Purl Texture',
 };
 
+/** Helvetica (WinAnsi) can't encode emoji/CJK/etc — strip anything outside Latin-1 so a
+ * decorated pattern name degrades gracefully instead of failing the whole export. */
+function sanitizeWinAnsi(text: string): string {
+  return text
+    .replace(/[^ -~ -ÿ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export async function renderPatternPdf(input: PdfPatternInput): Promise<Uint8Array> {
   const writer = await PdfWriter.create();
-  const title = input.title?.trim() || 'Knitting Pattern';
+  const title = sanitizeWinAnsi(input.title?.trim() ?? '') || 'Knitting Pattern';
 
-  writer.heading(title, 20);
+  for (const line of wrapText(title, writer.boldFont, 20, PAGE_WIDTH - MARGIN * 2)) {
+    writer.heading(line, 20);
+  }
   writer.paragraph(TECHNIQUE_LABEL[input.technique], { size: 12, font: writer.boldFont });
   writer.paragraph(`${input.widthStitches} stitches x ${input.heightRows} rows`, { size: 10.5 });
 

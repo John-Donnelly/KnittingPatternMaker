@@ -29,7 +29,11 @@ export function InstructionsList({ pattern }: Props) {
           {pattern.technique === 'intarsia' && (
             <li>Use one bobbin per color block and twist the yarns at every color change.</li>
           )}
-          <li>Working in the round instead? Read every round right-to-left and knit all rounds.</li>
+          <li>
+            {pattern.technique === 'texture'
+              ? 'Working in the round instead? Read every chart row right-to-left, and work dark squares as purl, light squares as knit, on every round.'
+              : 'Working in the round instead? Read every round right-to-left and knit all rounds.'}
+          </li>
         </ul>
       </details>
       <ol className="instructions">

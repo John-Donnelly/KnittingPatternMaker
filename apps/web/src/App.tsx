@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildPatternResult,
   buildYardageEstimate,
@@ -116,14 +116,18 @@ export function App() {
 
   /** Long edge cap for client-side downscaling: bounds upload size and server memory while
    * staying comfortably above the ~4px-per-cell floor the chart-grid detector needs on
-   * typical scans. PNGs re-encode as PNG (lossless — chart screenshots must not gain JPEG
-   * halos); everything else re-encodes as high-quality JPEG. */
+   * typical scans. */
   const MAX_SOURCE_EDGE = 3000;
+  /** Formats every backend (Node/sharp AND Workers/WASM) decodes natively. Anything else
+   * (GIF, BMP, TIFF, ...) is normalized client-side after decoding. */
+  const NATIVE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+  /** Monotonic token: if the user picks a second image while the first is still decoding,
+   * only the LATEST selection may commit state (decodes can finish out of order). */
+  const uploadSeq = useRef(0);
 
   const onImageSelected = (nextFile: File) => {
+    const seq = ++uploadSeq.current;
     setUploadError(null);
-    setResponse(null);
-    setError(null);
     void (async () => {
       let bitmap: ImageBitmap;
       try {
@@ -131,6 +135,9 @@ export function App() {
         // instead of silently rendering nothing (the old behavior for iPhone photos).
         bitmap = await createImageBitmap(nextFile);
       } catch {
+        if (seq !== uploadSeq.current) return;
+        // Keep any already-generated pattern on screen — a failed NEW selection must not
+        // destroy the user's current work.
         setUploadError(
           "We couldn't read that image — it may be an unsupported format (like HEIC). Please use a JPG, PNG, or WebP file.",
         );
@@ -139,8 +146,10 @@ export function App() {
       let chosen = nextFile;
       let width = bitmap.width;
       let height = bitmap.height;
-      if (Math.max(width, height) > MAX_SOURCE_EDGE) {
-        const scale = MAX_SOURCE_EDGE / Math.max(width, height);
+      const needsResize = Math.max(width, height) > MAX_SOURCE_EDGE;
+      const needsConvert = !NATIVE_TYPES.includes(nextFile.type);
+      if (needsResize || needsConvert) {
+        const scale = needsResize ? MAX_SOURCE_EDGE / Math.max(width, height) : 1;
         const w = Math.max(1, Math.round(width * scale));
         const h = Math.max(1, Math.round(height * scale));
         const canvas = document.createElement('canvas');
@@ -149,7 +158,9 @@ export function App() {
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(bitmap, 0, 0, w, h);
-          const keepPng = nextFile.type === 'image/png';
+          // Lossless-ish sources (PNG/GIF/BMP — typically flat art) re-encode as PNG so
+          // chart screenshots don't gain JPEG halos; photos re-encode as high-quality JPEG.
+          const keepPng = nextFile.type !== 'image/jpeg' && nextFile.type !== 'image/webp';
           const blob = await new Promise<Blob | null>((resolve) =>
             canvas.toBlob(resolve, keepPng ? 'image/png' : 'image/jpeg', 0.92),
           );
@@ -161,6 +172,9 @@ export function App() {
         }
       }
       bitmap.close();
+      if (seq !== uploadSeq.current) return;
+      setResponse(null);
+      setError(null);
       setFile(chosen);
       setSourceDims({ width, height });
       setImageUrl((prev) => {
@@ -196,7 +210,8 @@ export function App() {
     const sourceAspect = sourceDims.width / sourceDims.height;
     const ratio = knittedAspect / sourceAspect;
     if (ratio >= 0.87 && ratio <= 1.15) return null;
-    const pct = Math.round(Math.abs(ratio - 1) * 100);
+    // Symmetric distortion: 0.5 means "2x taller", which is 100% distortion, not 50%.
+    const pct = Math.round((Math.max(ratio, 1 / ratio) - 1) * 100);
     return `Heads-up: at ${form.widthStitches} × ${form.heightRows} the knitted result will be stretched ~${pct}% ${
       ratio > 1 ? 'wider' : 'taller'
     } than the image. Switch Crop to auto, or adjust the width/height, to keep its proportions.`;

@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Cloudflare Workers deployment** (`apps/worker`): one Worker serves the API (Hono), the
+  built SPA (static assets, SPA fallback), and D1 storage; images decode via @jsquash WASM
+  codecs with EXIF rotation (exifr) and a pre-decode 24-megapixel header check; sessions are
+  Web Crypto HMAC cookies; PNG export uses a pure fflate encoder. Output verified
+  **byte-identical** to the Node server under local workerd. Setup/deploy/cost docs in
+  `apps/worker/README.md` ($5/mo Workers Paid flat; ~50k patterns/month included).
+- **Correctness fixes to the pattern text itself**: WS colorwork rows now read `P`, not `K`
+  (following the old text literally produced garter stitch); texture charts no longer
+  double-decode gamma (mid-grays stayed far too dark) and keep their two tones (the
+  wool-shade merge could flatten a whole motif); stranded yardage now charges edge carries.
+- **Professional PDF export**: pattern title + slug filenames, per-color chart symbols
+  (B&W-print/colorblind-safe; dot-means-purl for texture), RS/WS row numbers on the correct
+  sides, right-counted stitch numbers, every-10 guide lines, how-to-read box, finished size
+  in in/cm, CYC yarn-weight suggestion, page footers.
+- **First-run and trust polish**: bundled sample motifs, decode-failure messages (HEIC),
+  client-side downscaling, landing pricing card (£2.99/month, free during early access),
+  in-app chart-reading help, save/delete confirmations, AA contrast, aria-live statuses,
+  mobile chart-first ordering.
+
 - **Adaptive palette refinement — representative pixel art, only relevant colors.**
   Median-cut's two systematic failures were measured on real images (32×32 sprite at 8
   colors, averaged sampling: mean ΔE 13.7 vs source with 3 "phantom" palette entries that

@@ -37,9 +37,22 @@ export interface WorkerConfig {
   oidcEnabled: boolean;
 }
 
+let warnedMissingSecret = false;
+
 export function loadConfig(env: Env): WorkerConfig {
   const publicUrl = (env.PUBLIC_URL ?? 'http://localhost:8787').replace(/\/$/, '');
-  const oidcEnabled = Boolean(env.OIDC_ISSUER && env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET);
+  // Sign-in needs BOTH the OIDC trio and a session secret to sign cookies with. Workers
+  // have no startup validation hook (unlike the Node server, which fails fast), so a
+  // missing SESSION_SECRET must degrade coherently: auth reports as unavailable instead of
+  // rendering a Sign-in button that 503s on every click.
+  const oidcVarsPresent = Boolean(env.OIDC_ISSUER && env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET);
+  const oidcEnabled = oidcVarsPresent && Boolean(env.SESSION_SECRET);
+  if (oidcVarsPresent && !env.SESSION_SECRET && !warnedMissingSecret) {
+    warnedMissingSecret = true;
+    console.warn(
+      'OIDC vars are set but SESSION_SECRET is missing — sign-in is disabled. Run: wrangler secret put SESSION_SECRET',
+    );
+  }
   return {
     sessionSecret: env.SESSION_SECRET,
     oidcIssuer: env.OIDC_ISSUER,
@@ -47,7 +60,10 @@ export function loadConfig(env: Env): WorkerConfig {
     oidcClientSecret: env.OIDC_CLIENT_SECRET,
     publicUrl,
     redirectUri: env.OIDC_REDIRECT_URI ?? `${publicUrl}/api/auth/callback`,
-    authRequired: env.AUTH_REQUIRED === 'true' && oidcEnabled,
+    // Intentionally NOT gated on oidcEnabled: if the operator demanded sign-in but broke the
+    // auth config, requests fail CLOSED with an explicit misconfiguration error (see
+    // requireSessionIfConfigured) rather than silently opening the app to everyone.
+    authRequired: env.AUTH_REQUIRED === 'true',
     oidcEnabled,
   };
 }

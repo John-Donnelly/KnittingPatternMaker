@@ -1,0 +1,6 @@
+# Cloudflare static-asset headers (applied by the Workers assets pipeline; inert elsewhere).
+# Mirrors the Node server's helmet CSP so the SPA gets the same protections on Workers.
+/*
+  Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin

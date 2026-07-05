@@ -68,6 +68,58 @@ describe('POST /api/export/pdf', () => {
     }
   });
 
+  it('survives a title with emoji/CJK (sanitized for the WinAnsi font, slugged filename)', async () => {
+    const res = await request(app.server)
+      .post('/api/export/pdf')
+      .send({ ...samplePatternSpecBody(), title: '🧶 Winter 森 Forest ♥' })
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk: Buffer) => chunks.push(chunk));
+        response.on('end', () => callback(null, Buffer.concat(chunks)));
+      });
+    expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toContain('winter-forest.pdf');
+    expect((res.body as Buffer).subarray(0, 5).toString('latin1')).toBe('%PDF-');
+  });
+
+  it('does not split a chart that fits one page into an orphan sliver column (cellW rounding)', async () => {
+    // 35 sts at the default gauge used to round cellW UP past the page width, yielding an
+    // unexplained "piece 2 of 2" page holding a single 1-stitch column while 34 and 36 fit.
+    const { PDFDocument } = await import('pdf-lib');
+    const pageCounts: number[] = [];
+    for (const width of [34, 35, 36]) {
+      const indices = Array.from({ length: width * 35 }, (_, i) => i % 2);
+      const res = await request(app.server)
+        .post('/api/export/pdf')
+        .send({
+          technique: 'stranded' as const,
+          gauge: { stitchesPer4In: 22, rowsPer4In: 30 },
+          grid: {
+            width,
+            height: 35,
+            indices,
+            palette: [
+              { r: 20, g: 20, b: 20 },
+              { r: 235, g: 235, b: 235 },
+            ],
+          },
+        })
+        .buffer(true)
+        .parse((response, callback) => {
+          const chunks: Buffer[] = [];
+          response.on('data', (chunk: Buffer) => chunks.push(chunk));
+          response.on('end', () => callback(null, Buffer.concat(chunks)));
+        });
+      expect(res.status).toBe(200);
+      const doc = await PDFDocument.load(new Uint8Array(res.body as Buffer));
+      pageCounts.push(doc.getPageCount());
+    }
+    // All three widths fit a single chart page, so total page counts must match.
+    expect(pageCounts[1]).toBe(pageCounts[0]);
+    expect(pageCounts[1]).toBe(pageCounts[2]);
+  });
+
   it('rejects a grid with mismatched index length', async () => {
     const body = samplePatternSpecBody();
     body.grid.indices = body.grid.indices.slice(0, 5);

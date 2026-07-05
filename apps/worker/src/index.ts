@@ -144,9 +144,19 @@ app.post('/api/auth/logout', (c) => {
 
 async function requireSessionIfConfigured(
   c: { env: Env } & { req: { raw: Request } },
-): Promise<{ ok: true } | { ok: false; status: 401; error: string }> {
+): Promise<{ ok: true } | { ok: false; status: 401 | 503; error: string }> {
   const config = loadConfig(c.env);
   if (!config.authRequired) return { ok: true };
+  // Fail CLOSED with the real cause when sign-in is required but not actually usable —
+  // otherwise users get an unwinnable 401 loop while the operator sees nothing wrong.
+  if (!config.oidcEnabled) {
+    return {
+      ok: false,
+      status: 503,
+      error:
+        'Server misconfigured: AUTH_REQUIRED is set but sign-in is not fully configured (check SESSION_SECRET and the OIDC settings)',
+    };
+  }
   const user = await sessionUser(c, config.sessionSecret);
   if (user) return { ok: true };
   return { ok: false, status: 401, error: 'Sign in to generate patterns' };
@@ -168,10 +178,16 @@ app.post('/api/pattern', async (c) => {
     return c.json({ error: 'Expected multipart form data with an "image" file field' }, 400);
   }
 
-  const image = form.get('image');
-  // FormDataEntryValue is File | string; a string means the field wasn't a file upload.
+  // workers-types declares FormData.get() as string|null, but with files enabled the runtime
+  // returns File objects for uploads — widen the type to match reality.
+  const image = form.get('image') as unknown as File | string | null;
   if (image === null || typeof image === 'string') {
     return c.json({ error: 'Missing "image" file field' }, 400);
+  }
+  // The Content-Length header check above is only a fast path — chunked uploads omit it,
+  // so enforce the cap on the actual received file too.
+  if (image.size > MAX_UPLOAD_BYTES) {
+    return c.json({ error: 'Uploaded file is too large (max 25MB)' }, 413);
   }
   // Reject unexpected extra file fields rather than silently ignoring them.
   for (const [key, value] of form.entries()) {

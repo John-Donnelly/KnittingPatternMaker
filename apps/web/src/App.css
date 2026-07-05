@@ -608,7 +608,7 @@ fieldset.subpanel {
   border-radius: 6px;
 }
 
-.uploader__sample:hover {
+button.uploader__sample:not(:disabled):hover {
   border-color: var(--accent);
   background: var(--accent-soft);
   transform: none;

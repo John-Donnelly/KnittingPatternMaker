@@ -18,10 +18,12 @@ import type { PixelBuffer } from 'knitting-pattern-core';
 
 export class ImageDecodeError extends Error {}
 
-/** Uploaded images above this many pixels are rejected pre-decode (isolate memory bound).
- * The frontend downscales client-side to a 3000px long edge (9MP) — this is the backstop
- * for direct API callers. */
-export const MAX_MEGAPIXELS = 24;
+/** Uploaded images above this many pixels are rejected pre-decode. Budget: the decoded RGBA
+ * plane is 4 bytes/px (48MB at 12MP) and the pipeline's sampling/auto stages allocate
+ * several further passes over it — 12MP keeps peak usage safely inside the 128MB isolate.
+ * The frontend downscales client-side to a 3000px long edge (9MP); this is the backstop for
+ * direct API callers. */
+export const MAX_MEGAPIXELS = 12;
 
 let wasmReady: Promise<void> | null = null;
 function ensureWasm(): Promise<void> {

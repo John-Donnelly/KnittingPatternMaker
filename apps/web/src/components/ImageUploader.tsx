@@ -43,6 +43,7 @@ export function ImageUploader({ onImageSelected }: Props) {
     setRejection(null);
     try {
       const res = await fetch(sample.url);
+      if (!res.ok) throw new Error(`sample fetch failed: ${res.status}`);
       const blob = await res.blob();
       onImageSelected(new File([blob], `${sample.name.toLowerCase()}.png`, { type: 'image/png' }));
     } catch {
@@ -64,6 +65,9 @@ export function ImageUploader({ onImageSelected }: Props) {
       tabIndex={0}
       aria-label="Choose or drop an image to convert into a knitting pattern"
       onKeyDown={(e) => {
+        // Only when the container ITSELF is focused — Enter/Space on the sample buttons
+        // inside must activate those buttons, not hijack into the file picker.
+        if (e.target !== e.currentTarget) return;
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault(); // Space must not scroll the page
           inputRef.current?.click();
