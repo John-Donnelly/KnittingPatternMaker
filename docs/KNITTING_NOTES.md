@@ -186,6 +186,18 @@ Two independent controls:
 The row-by-row instructions and PDF are generated from the **already-tiled** chart, so you just
 knit them straight through; each motif width/height simply repeats.
 
+### How the seamless join works
+
+Primary method — **minimum-error-boundary-cut quilting** (the seam step of Efros–Freeman
+image quilting, `packages/core/src/image/quilt.ts`): the motif is sampled with a few extra
+columns/rows of REAL continuation content from past its edge in the source, and a
+dynamic-programming seam merges that continuation with the opposite edge along the path
+where the two match best. The join follows natural edges in the content instead of
+cross-fading a straight band across it, which removes the smearing artifacts of blending.
+The seam path is constrained so the wrap flow is exact: the output's last column continues
+into its first column exactly as the source content did. Axes under 10 stitches fall back
+to the legacy adaptive blend below.
+
 ### How the seamless blend works
 
 - Implementation (`packages/core/src/image/seamless.ts`): the two edges of each row (and/or

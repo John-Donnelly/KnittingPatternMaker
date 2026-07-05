@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Seamless joins upgraded to minimum-error-boundary-cut quilting** (Efros–Freeman seam
+  step): the motif is oversampled with real continuation content past its edge and merged
+  with the opposite edge along the best DP seam, so repeats join along natural content edges
+  instead of a cross-faded band — visibly fewer artifacts on structured motifs. Deterministic;
+  axes under 10 stitches keep the legacy blend. 6 new tests; verified on the tiled forest
+  border.
+
 - **Cloudflare Workers deployment** (`apps/worker`): one Worker serves the API (Hono), the
   built SPA (static assets, SPA fallback), and D1 storage; images decode via @jsquash WASM
   codecs with EXIF rotation (exifr) and a pre-decode 24-megapixel header check; sessions are

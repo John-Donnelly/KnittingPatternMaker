@@ -17,6 +17,7 @@ export { sampleImage } from './image/sample.js';
 export { ditherBayer4, ditherFloydSteinberg } from './image/dither.js';
 export { quantizeGrid } from './image/quantizeGrid.js';
 export { makeSeamless, seamlessModeToOptions } from './image/seamless.js';
+export { quiltSeamless, quiltOverlap } from './image/quilt.js';
 export type { SeamlessOptions } from './image/seamless.js';
 export { tileGrid } from './image/tileGrid.js';
 export {

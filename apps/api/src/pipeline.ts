@@ -5,6 +5,8 @@ import {
   encodePatternSpec,
   finishedSize,
   makeSeamless,
+  quiltOverlap,
+  quiltSeamless,
   resolveAutoOptions,
   sampleImage,
   seamlessModeToOptions,
@@ -98,18 +100,42 @@ export async function runPipeline(
       options.gauge,
     );
 
-  const pixelated = sampleImage(
-    source,
-    crop,
-    options.widthStitches,
-    options.heightRows,
-    options.sampling,
-  );
   const seamlessAxes = seamlessModeToOptions(options.seamless);
-  const samples =
-    seamlessAxes.horizontal || seamlessAxes.vertical
-      ? makeSeamless(pixelated, options.widthStitches, options.heightRows, seamlessAxes)
-      : pixelated;
+  // Seamless joins use minimum-error-boundary-cut quilting: oversample a few columns/rows of
+  // real continuation content past the motif's edge and merge it with the opposite edge along
+  // the best seam (packages/core/src/image/quilt.ts). Axes too small to quilt fall back to
+  // the legacy blend.
+  const kx = seamlessAxes.horizontal ? quiltOverlap(options.widthStitches) : 0;
+  const ky = seamlessAxes.vertical ? quiltOverlap(options.heightRows) : 0;
+  let samples: ReturnType<typeof sampleImage>;
+  if (kx > 0 || ky > 0) {
+    const oversampled = sampleImage(
+      source,
+      crop,
+      options.widthStitches + kx,
+      options.heightRows + ky,
+      options.sampling,
+    );
+    samples = quiltSeamless(
+      oversampled,
+      options.widthStitches + kx,
+      options.heightRows + ky,
+      options.widthStitches,
+      options.heightRows,
+    );
+  } else {
+    const pixelated = sampleImage(
+      source,
+      crop,
+      options.widthStitches,
+      options.heightRows,
+      options.sampling,
+    );
+    samples =
+      seamlessAxes.horizontal || seamlessAxes.vertical
+        ? makeSeamless(pixelated, options.widthStitches, options.heightRows, seamlessAxes)
+        : pixelated;
+  }
 
   const motifGrid: Grid =
     options.technique === 'texture'
