@@ -157,6 +157,15 @@ tracks Lab lightness and keeps mixes visually centered.
   distinct yarns the image needs. The threshold is configurable (`shadeMergeDeltaE` in the API,
   the "Shade grouping" slider in the UI): raise it to group more aggressively, set 0 to keep
   every shade.
+- **Alternatives evaluated and rejected (2026-07, measured on the freely-licensed test
+  set):** _libimagequant_ (pngquant's engine, via its Python bindings) lost to our
+  median-cut + adaptive refinement on flat art (32x32 sprite @8: mean dE 4.39 vs our 2.73;
+  upscaled landscape @9: 0.81 vs 0.22), tied on photos, and won only on a noisy archival
+  scan (3.20 vs 4.08) — not worth a GPL/commercial WASM dependency for a regression on the
+  primary use case. A _salience-based "detail" sampling mode_ (Pyxelate-style minority-
+  cluster preservation) also measured worse than dominant sampling everywhere it was meant
+  to help (evil-face 32->16: dE 22.7 vs 19.2); heavy 2x-downsampling of 1px-detail art
+  remains a documented limitation.
 - Dithering (`none` / ordered "Bayer" / Floyd–Steinberg) is offered, but **`none` is the default
   and the recommendation for stranded/intarsia colorwork**: dithering scatters isolated single
   stitches of a color across the grid, which is impractical to knit as clean color regions.
