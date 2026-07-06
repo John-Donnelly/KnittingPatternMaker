@@ -89,6 +89,121 @@ function averageColor(a: RGB, b: RGB): RGB {
 }
 
 /**
+ * Makes a motif tile along an axis WITHOUT any extra source content, by splicing a patch of
+ * the motif's own interior across the wrap join (classic Efros–Freeman texture synthesis,
+ * applied to the one join that matters). The patch is chosen as the interior strip whose two
+ * halves best match the motif's two edges; each half is then seam-cut into its edge. When
+ * tiled, the join itself shows the patch's interior adjacency — real, continuous content —
+ * instead of a cross-faded band (which quantizes into visible mush) or a hard cut.
+ *
+ * Used when the crop cannot be extended for continuation content (chart scans that span the
+ * whole source image). Deterministic: argmin patch search with lowest-index tie-breaking,
+ * same DP seams as quiltSeamless.
+ */
+/** True when an axis of this length can take an interior wrap patch (needs 4x the overlap). */
+export function canWrapPatch(length: number): boolean {
+  return Math.min(quiltOverlap(length), Math.floor(length / 4)) >= 2;
+}
+
+export function quiltWrapPatch(
+  samples: readonly RGB[],
+  width: number,
+  height: number,
+  axes: { horizontal: boolean; vertical: boolean },
+): RGB[] {
+  if (samples.length !== width * height) {
+    throw new Error(`samples length ${samples.length} != ${width}x${height}`);
+  }
+  let grid = samples.slice();
+  if (axes.horizontal) grid = wrapPatchAxis(grid, width, height, true);
+  if (axes.vertical) grid = wrapPatchAxis(grid, width, height, false);
+  return grid;
+}
+
+function wrapPatchAxis(grid: RGB[], width: number, height: number, horizontal: boolean): RGB[] {
+  const len = horizontal ? width : height; // along the axis being joined
+  const lines = horizontal ? height : width; // perpendicular extent
+  const k = Math.min(quiltOverlap(len), Math.floor(len / 4));
+  if (k < 2) return grid;
+
+  const at = (pos: number, line: number): RGB =>
+    (horizontal ? grid[line * width + pos] : grid[pos * width + line]) ?? { r: 0, g: 0, b: 0 };
+  const setAt = (out: RGB[], pos: number, line: number, c: RGB): void => {
+    if (horizontal) out[line * width + pos] = c;
+    else out[pos * width + line] = c;
+  };
+
+  const labs = grid.map((c) => rgbToLab(c));
+  type Lab = ReturnType<typeof rgbToLab>;
+  const labAt = (pos: number, line: number): Lab =>
+    (horizontal ? labs[line * width + pos] : labs[pos * width + line]) ?? { l: 0, a: 0, b: 0 };
+
+  // --- pick the interior patch (2k wide) whose halves best match the two edges ------------
+  // Edge zones: R = last k positions (must flow into the patch's left half at the join),
+  // L = first k positions (the patch's right half must flow into them).
+  let bestStart = k;
+  let bestCost = Infinity;
+  for (let p = k; p + 2 * k <= len - k; p++) {
+    let cost = 0;
+    for (let line = 0; line < lines; line++) {
+      for (let i = 0; i < k; i++) {
+        cost += labDistanceSq(labAt(p + i, line), labAt(len - k + i, line));
+        cost += labDistanceSq(labAt(p + k + i, line), labAt(i, line));
+      }
+    }
+    if (cost < bestCost) {
+      bestCost = cost;
+      bestStart = p;
+    }
+  }
+
+  // --- seam-cut each patch half into its edge ------------------------------------------------
+  // Right edge: original R vs patch's left half; keep original near the interior, patch
+  // content at the join.
+  const errRight: number[][] = [];
+  const errLeft: number[][] = [];
+  for (let line = 0; line < lines; line++) {
+    const rowR: number[] = [];
+    const rowL: number[] = [];
+    for (let i = 0; i < k; i++) {
+      rowR.push(labDistanceSq(labAt(len - k + i, line), labAt(bestStart + i, line)));
+      rowL.push(labDistanceSq(labAt(bestStart + k + i, line), labAt(i, line)));
+    }
+    errRight.push(rowR);
+    errLeft.push(rowL);
+  }
+  const cutsRight = minErrorSeam(errRight, lines, k);
+  const cutsLeft = minErrorSeam(errLeft, lines, k);
+
+  const out = grid.slice();
+  for (let line = 0; line < lines; line++) {
+    const cr = cutsRight[line] ?? 1;
+    const cl = cutsLeft[line] ?? 1;
+    for (let i = 0; i < k; i++) {
+      // Right edge: original before the cut, patch after — so the last position is pure
+      // patch content, whose successor (patch pos bestStart+k) appears at the next tile's
+      // first position. The join reproduces the patch's own interior adjacency.
+      const right =
+        i < cr
+          ? at(len - k + i, line)
+          : i === cr
+            ? averageColor(at(len - k + i, line), at(bestStart + i, line))
+            : at(bestStart + i, line);
+      setAt(out, len - k + i, line, right);
+      // Left edge: patch before the cut, original after.
+      const left =
+        i < cl
+          ? at(bestStart + k + i, line)
+          : i === cl
+            ? averageColor(at(bestStart + k + i, line), at(i, line))
+            : at(i, line);
+      setAt(out, i, line, left);
+    }
+  }
+  return out;
+}
+
+/**
  * Merges an oversampled grid down to `targetW` x `targetH`, seam-cutting each oversampled
  * axis so the result tiles without a visible join.
  *

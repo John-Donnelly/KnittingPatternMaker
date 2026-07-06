@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { quiltOverlap, quiltSeamless } from '../src/image/quilt.js';
+import { canWrapPatch, quiltOverlap, quiltSeamless, quiltWrapPatch } from '../src/image/quilt.js';
 import { labDistanceSq, rgbToLab } from '../src/color/lab.js';
 import type { RGB } from '../src/types.js';
 
@@ -103,5 +103,56 @@ describe('quiltSeamless', () => {
     const a = quiltSeamless(samples, 46, 36, 40, 30);
     const b = quiltSeamless(samples, 46, 36, 40, 30);
     expect(a).toEqual(b);
+  });
+});
+
+describe('quiltWrapPatch', () => {
+  it('reports applicability correctly', () => {
+    expect(canWrapPatch(8)).toBe(false);
+    expect(canWrapPatch(40)).toBe(true);
+  });
+
+  it('makes the wrap join continuous using the motif interior (no extra content)', () => {
+    // Ramp with a hard wrap discontinuity plus a self-similar interior: the interior holds
+    // every gray level, so a patch exists whose halves match both edges.
+    const W = 40;
+    const H = 12;
+    const samples = sampleField(W, H, (x) => {
+      const v = Math.round((x / (W - 1)) * 255);
+      return { r: v, g: v, b: v };
+    });
+    const out = quiltWrapPatch(samples, W, H, { horizontal: true, vertical: false });
+    expect(out).toHaveLength(W * H);
+
+    let joinJump = 0;
+    let interiorMax = 0;
+    for (let y = 0; y < H; y++) {
+      const row = out.slice(y * W, (y + 1) * W);
+      joinJump = Math.max(joinJump, dist(row[W - 1] as RGB, row[0] as RGB));
+      for (let x = 1; x < W; x++) {
+        interiorMax = Math.max(interiorMax, dist(row[x - 1] as RGB, row[x] as RGB));
+      }
+    }
+    // Raw wrap jump on this ramp is ~100 Lab; after patching, the join must read like any
+    // other stitch step in the fabric.
+    expect(joinJump).toBeLessThanOrEqual(interiorMax * 1.5);
+  });
+
+  it('leaves the interior untouched and is deterministic', () => {
+    const W = 36;
+    const H = 20;
+    let seed = 5;
+    const rand = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) % 256;
+    const samples = sampleField(W, H, () => ({ r: rand(), g: rand(), b: rand() }));
+    const a = quiltWrapPatch(samples, W, H, { horizontal: true, vertical: true });
+    const b = quiltWrapPatch(samples, W, H, { horizontal: true, vertical: true });
+    expect(a).toEqual(b);
+    const k = Math.min(quiltOverlap(W), Math.floor(W / 4));
+    const ky = Math.min(quiltOverlap(H), Math.floor(H / 4));
+    for (let y = ky; y < H - ky; y++) {
+      for (let x = k; x < W - k; x++) {
+        expect(a[y * W + x]).toEqual(samples[y * W + x]);
+      }
+    }
   });
 });

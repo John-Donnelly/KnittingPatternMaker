@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Un-quiltable joins now splice the motif's own interior across the seam** (full
+  Efros-Freeman): when the crop can't extend for continuation content, the interior strip
+  whose halves best match the two edges is seam-cut into them, so the tiled join shows real
+  continuous content instead of a cross-fade that quantizes into mush (user-reported across
+  three iterations; the palette also stops wasting entries on blend gradients). Legacy blend
+  remains only for axes too small to patch, with a preserveBlends quantizer mode keeping its
+  gradient colors when it does run.
 - **Blend-fallback joins smeared up to a quarter of the motif.** When an axis can't be
   quilted (chart scans whose crop spans the whole image), the legacy blend now runs with a
   tight band cap (10% of the axis instead of 25%) — a wide cross-fade through discrete chart

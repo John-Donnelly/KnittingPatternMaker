@@ -29,7 +29,9 @@ export function quantizeGrid(
     );
   }
 
-  const rawPalette = adaptivePalette(samples, options.maxColors);
+  const rawPalette = adaptivePalette(samples, options.maxColors, {
+    preserveBlends: options.preserveBlends,
+  });
 
   // Weight each raw palette entry by how many cells it actually wins, so the merged wool
   // color is dominated by the shade that covers the most fabric.

@@ -353,7 +353,21 @@ function mergeNearDuplicates(clusters: Cluster[], centers: RGB[]): RGB[] {
  *
  * Ordered darkest to lightest like {@link medianCutPalette} (stable legend ordering).
  */
-export function adaptivePalette(samples: readonly RGB[], maxColors: number): RGB[] {
+export interface AdaptivePaletteOptions {
+  /**
+   * Keep legitimate in-between colors: skips the prune and mixture-swap steps. Used when the
+   * samples DELIBERATELY contain gradients — e.g. a seamless-join blend zone, whose
+   * transition colors would otherwise be culled as "phantom blend artifacts" and snap the
+   * join to harsh patches.
+   */
+  preserveBlends?: boolean | undefined;
+}
+
+export function adaptivePalette(
+  samples: readonly RGB[],
+  maxColors: number,
+  options: AdaptivePaletteOptions = {},
+): RGB[] {
   if (maxColors < 1) {
     throw new Error(`maxColors must be >= 1, got ${maxColors}`);
   }
@@ -391,7 +405,7 @@ export function adaptivePalette(samples: readonly RGB[], maxColors: number): RGB
     // ---- Prune negligible near-redundant entries -------------------------------------------
     // Drop entries covering < PRUNE_MIN_COVERAGE whose members all fit within
     // PRUNE_MAX_DELTA_E of some other entry. Distinct accents fail the dE guard and survive.
-    if (centers.length > 1) {
+    if (centers.length > 1 && !options.preserveBlends) {
       for (;;) {
         const labs = centers.map(rgbToLab);
         let dropIdx = -1;
@@ -471,7 +485,7 @@ export function adaptivePalette(samples: readonly RGB[], maxColors: number): RGB
     // ---- Swap: sacrifice a blend artifact for a badly-needed split ---------------------------
     // Only when the palette is full (otherwise grow already did the job) and only when the
     // entry being dropped is a mixture of two other entries — never a distinct accent.
-    if (centers.length === maxColors && centers.length >= 3) {
+    if (centers.length === maxColors && centers.length >= 3 && !options.preserveBlends) {
       const labs = centers.map(rgbToLab);
 
       // Cheapest droppable blend (SSE increase from reassigning its members elsewhere).

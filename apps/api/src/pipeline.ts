@@ -5,8 +5,10 @@ import {
   encodePatternSpec,
   finishedSize,
   makeSeamless,
+  canWrapPatch,
   quiltOverlap,
   quiltSeamless,
+  quiltWrapPatch,
   resolveAutoOptions,
   sampleImage,
   seamlessModeToOptions,
@@ -134,10 +136,23 @@ export async function runPipeline(
     horizontal: seamlessAxes.horizontal && kx === 0,
     vertical: seamlessAxes.vertical && ky === 0,
   };
-  if (blendAxes.horizontal || blendAxes.vertical) {
-    // Fallback blending only: keep the band tight — a wide cross-fade through discrete
-    // chart content reads as a smeared column at every tile join.
-    samples = makeSeamless(samples, W, H, { ...blendAxes, maxBandFraction: 0.1 });
+  // No room to extend the crop: splice a patch of the motif's own interior across the wrap
+  // join (Efros-Freeman) so the seam shows real continuous content. Axes too small for a
+  // patch get the legacy blend as the last resort.
+  const patchAxes = {
+    horizontal: blendAxes.horizontal && canWrapPatch(W),
+    vertical: blendAxes.vertical && canWrapPatch(H),
+  };
+  if (patchAxes.horizontal || patchAxes.vertical) {
+    samples = quiltWrapPatch(samples, W, H, patchAxes);
+  }
+  const legacyAxes = {
+    horizontal: blendAxes.horizontal && !patchAxes.horizontal,
+    vertical: blendAxes.vertical && !patchAxes.vertical,
+  };
+  const blended = legacyAxes.horizontal || legacyAxes.vertical;
+  if (blended) {
+    samples = makeSeamless(samples, W, H, legacyAxes);
   }
 
   const motifGrid: Grid =
@@ -147,6 +162,9 @@ export async function runPipeline(
           maxColors: options.maxColors,
           dither: options.dither,
           shadeMergeDeltaE: options.shadeMergeDeltaE,
+          // Blend zones deliberately contain gradient colors; without this the palette
+          // refinement culls them as phantoms and the join snaps to harsh patches.
+          preserveBlends: blended,
         });
 
   // Materialize the repeat: tile the quantized motif into the final chart.

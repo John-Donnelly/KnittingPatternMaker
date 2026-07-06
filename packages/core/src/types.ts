@@ -58,6 +58,8 @@ export interface QuantizeOptions {
    * (see color/consolidate.ts). Defaults to WOOL_SHADE_DELTA_E; 0 keeps every shade.
    */
   shadeMergeDeltaE?: number | undefined;
+  /** Keep legitimate gradient colors (seamless blend zones) — see AdaptivePaletteOptions. */
+  preserveBlends?: boolean | undefined;
 }
 
 /**
