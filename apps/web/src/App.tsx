@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  applyColorEdits,
   buildPatternResult,
   buildYardageEstimate,
+  deserializeGrid,
+  encodePatternSpec,
+  isIdentityEdits,
   serializeGrid,
   stitchAspectRatio,
   suggestedCropRect,
   WOOL_SHADE_DELTA_E,
+  type ColorEdit,
   type CropRect,
   type GaugeSpec,
   type GridJson,
@@ -109,6 +114,9 @@ export function App() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [response, setResponse] = useState<PatternResponse | null>(null);
+  /** Per-palette-color on/off/substitute edits, applied client-side to the generated grid.
+   * Reset whenever a fresh pattern arrives. */
+  const [colorEdits, setColorEdits] = useState<ColorEdit[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -246,7 +254,10 @@ export function App() {
 
     submitPattern(file, options)
       .then((res) => {
-        if (!cancelled) setResponse(res);
+        if (!cancelled) {
+          setResponse(res);
+          setColorEdits(null);
+        }
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -339,6 +350,30 @@ export function App() {
   // resolved options), not the possibly-not-yet-submitted form state.
   const resolvedGauge = response?.resolvedOptions.gauge;
 
+  // Apply any per-color edits CLIENT-SIDE: the edited grid feeds the same pure core
+  // functions the share-link view uses, so chart, instructions, yardage, exports, share
+  // links, and saves all reflect the edits with no server round trip.
+  const view = useMemo(() => {
+    if (!response) return null;
+    const edits: ColorEdit[] = colorEdits ?? response.grid.palette.map(() => ({ enabled: true }));
+    if (isIdentityEdits(edits)) {
+      return {
+        grid: response.grid,
+        pattern: response.pattern,
+        yardage: response.yardage,
+        shareLink: response.shareLink,
+        edits,
+      };
+    }
+    const technique = response.resolvedOptions.technique;
+    const gauge = response.resolvedOptions.gauge;
+    const grid = applyColorEdits(deserializeGrid(response.grid), edits);
+    const pattern = buildPatternResult(technique, grid);
+    const yardage = buildYardageEstimate(grid, gauge, pattern);
+    const shareLink = encodePatternSpec({ technique, grid, ...(gauge ? { gauge } : {}) });
+    return { grid: serializeGrid(grid), pattern, yardage, shareLink, edits };
+  }, [response, colorEdits]);
+
   if (route !== '/app') {
     return (
       <main className="app">
@@ -408,28 +443,33 @@ export function App() {
               {loading ? (response ? 'Updating pattern…' : 'Making your pattern…') : ''}
             </p>
             {error && <p className="error">{error}</p>}
-            {response && (
+            {response && view && (
               <div className={loading ? 'results-wrap results-wrap--stale' : 'results-wrap'}>
                 <ResultView
-                  grid={response.grid}
+                  grid={view.grid}
                   gauge={resolvedGauge}
-                  pattern={response.pattern}
-                  yardage={response.yardage}
+                  pattern={view.pattern}
+                  yardage={view.yardage}
                   specBody={{
                     technique: response.resolvedOptions.technique,
-                    grid: response.grid,
+                    grid: view.grid,
                     seamless: response.seamless !== 'none',
                     ...(resolvedGauge ? { gauge: resolvedGauge } : {}),
                   }}
-                  shareUrl={`${window.location.origin}${window.location.pathname}#p=${response.shareLink}`}
+                  shareUrl={`${window.location.origin}${window.location.pathname}#p=${view.shareLink}`}
                   finishedSize={response.finishedSize}
                   seamless={response.seamless}
                   repeat={response.repeat}
                   defaultTitle=""
+                  legendEditable={{
+                    originalPalette: response.grid.palette,
+                    edits: view.edits,
+                    onChange: setColorEdits,
+                  }}
                 />
                 {auth?.authenticated && (
                   <SavePatternForm
-                    spec={response.shareLink}
+                    spec={view.shareLink}
                     defaultName={`${response.resolvedOptions.technique} ${response.grid.width}×${response.grid.height}`}
                     onSaved={() => setSavedRefresh((k) => k + 1)}
                   />
@@ -486,6 +526,7 @@ interface ResultViewProps {
   seamless?: SeamlessMode | undefined;
   repeat?: RepeatSpec | undefined;
   defaultTitle?: string | undefined;
+  legendEditable?: Parameters<typeof LegendList>[0]['editable'];
 }
 
 function ResultView({
@@ -499,6 +540,7 @@ function ResultView({
   seamless,
   repeat,
   defaultTitle,
+  legendEditable,
 }: ResultViewProps) {
   const repeated = repeat && (repeat.across > 1 || repeat.down > 1);
   return (
@@ -519,7 +561,7 @@ function ResultView({
           no visible seam.
         </p>
       )}
-      <LegendList grid={grid} yardage={yardage} />
+      <LegendList grid={grid} yardage={yardage} editable={legendEditable} />
       <WarningsPanel pattern={pattern} />
       <InstructionsList pattern={pattern} />
       <ExportBar spec={specBody} shareUrl={shareUrl} defaultTitle={defaultTitle} />

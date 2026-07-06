@@ -686,3 +686,17 @@ button.uploader__sample:not(:disabled):hover {
   font-size: 0.8rem;
   color: var(--muted);
 }
+
+.legend__row--off {
+  opacity: 0.5;
+}
+
+.legend__picker {
+  width: 32px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}

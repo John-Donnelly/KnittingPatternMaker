@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Per-color controls in the legend**: untick a color to turn it OFF (its stitches merge
+  into the perceptually nearest remaining color and the palette shrinks) or pick a new shade
+  to substitute it everywhere. Applied client-side through the same pure core functions the
+  share view uses (`applyColorEdits`), so the chart, written instructions, yardage, PDF/PNG
+  exports, share links, and saved patterns all reflect the edits instantly; a Reset restores
+  the generated palette. 6 core tests + 4 component tests.
+
 - **Seamless joins upgraded to minimum-error-boundary-cut quilting** (Efros–Freeman seam
   step): the motif is oversampled with real continuation content past its edge and merged
   with the opposite edge along the best DP seam, so repeats join along natural content edges
