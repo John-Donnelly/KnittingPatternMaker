@@ -350,6 +350,43 @@ describe('POST /api/pattern', () => {
     expect(defaulted.body.resolvedOptions.shadeMergeDeltaE).toBe(10);
   });
 
+  it('seamless never shifts the motif interior off its sampling grid (crop-squeeze regression)', async () => {
+    // Regression: quilting used to sample W+k cells across the SAME crop, squeezing every
+    // cell off the chart grid — 37.5% of cells changed perceptually on a real chart. The
+    // interior (away from any join band) must be identical with and without seamless.
+    const image = await makeGriddedChartPng(20, 20, 12);
+    const base = {
+      technique: 'intarsia',
+      widthStitches: 20,
+      heightRows: 20,
+      maxColors: 4,
+      dither: 'none',
+      sampling: 'dominant',
+      crop: { x: 0, y: 0, width: 240, height: 240 },
+    };
+    const plain = await request(app.server)
+      .post('/api/pattern')
+      .field('options', JSON.stringify({ ...base, seamless: 'none' }))
+      .attach('image', image, 'chart.png');
+    const seamless = await request(app.server)
+      .post('/api/pattern')
+      .field('options', JSON.stringify({ ...base, seamless: 'horizontal' }))
+      .attach('image', image, 'chart.png');
+    expect(plain.status).toBe(200);
+    expect(seamless.status).toBe(200);
+
+    const colorAt = (
+      res: { body: { grid: { indices: number[]; palette: { r: number }[] } } },
+      i: number,
+    ) => JSON.stringify(res.body.grid.palette[res.body.grid.indices[i] ?? 0]);
+    // Middle half of the columns is far outside any join treatment.
+    for (let y = 0; y < 20; y++) {
+      for (let x = 6; x < 14; x++) {
+        expect(colorAt(seamless, y * 20 + x)).toBe(colorAt(plain, y * 20 + x));
+      }
+    }
+  });
+
   it('rejects missing image', async () => {
     const res = await request(app.server)
       .post('/api/pattern')

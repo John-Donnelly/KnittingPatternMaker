@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Seamless quilting squeezed every cell off the sampling grid.** The quilting integration
+  sampled W+k cells across the SAME crop instead of extending it, so nothing aligned with a
+  detected chart grid anymore: features shifted and dominant sampling speckled (37.5% of
+  cells changed perceptually on a real chart, user-reported). The crop now extends
+  rightward/downward by exactly k cells (same cell size, motif cells untouched); axes
+  without room in the source fall back to the legacy blend per axis. Regression test pins
+  the motif interior identical with and without seamless. Remaining isolated single stitches
+  on the forest chart were verified faithful to the source (the original chart genuinely
+  contains them — inspected cell-by-cell at 6x zoom).
+
 ### Added
 
 - **Per-color controls in the legend**: untick a color to turn it OFF (its stitches merge

@@ -61,40 +61,41 @@ export async function runPipeline(
     );
 
   const seamlessAxes = seamlessModeToOptions(options.seamless);
-  // Seamless joins use minimum-error-boundary-cut quilting: oversample a few columns/rows of
-  // real continuation content past the motif's edge and merge it with the opposite edge along
-  // the best seam (packages/core/src/image/quilt.ts). Axes too small to quilt fall back to
-  // the legacy blend.
-  const kx = seamlessAxes.horizontal ? quiltOverlap(options.widthStitches) : 0;
-  const ky = seamlessAxes.vertical ? quiltOverlap(options.heightRows) : 0;
+  // Seamless joins use minimum-error-boundary-cut quilting: the CROP is extended a few cells
+  // past the motif's edge (same cell size — this must never change how the motif cells map
+  // onto the source, or chart-aligned crops shift and dominant sampling speckles) and the
+  // real continuation content is seam-merged with the opposite edge
+  // (packages/core/src/image/quilt.ts). Axes without room to extend in the source — or too
+  // small to quilt — fall back to the legacy blend.
+  const W = options.widthStitches;
+  const H = options.heightRows;
+  let kx = seamlessAxes.horizontal ? quiltOverlap(W) : 0;
+  let ky = seamlessAxes.vertical ? quiltOverlap(H) : 0;
+  const extraW = Math.round((crop.width * kx) / W);
+  const extraH = Math.round((crop.height * ky) / H);
+  if (kx > 0 && crop.x + crop.width + extraW > source.width) kx = 0;
+  if (ky > 0 && crop.y + crop.height + extraH > source.height) ky = 0;
+
   let samples: ReturnType<typeof sampleImage>;
   if (kx > 0 || ky > 0) {
-    const oversampled = sampleImage(
-      source,
-      crop,
-      options.widthStitches + kx,
-      options.heightRows + ky,
-      options.sampling,
-    );
-    samples = quiltSeamless(
-      oversampled,
-      options.widthStitches + kx,
-      options.heightRows + ky,
-      options.widthStitches,
-      options.heightRows,
-    );
+    const extendedCrop: CropRect = {
+      x: crop.x,
+      y: crop.y,
+      width: crop.width + (kx > 0 ? extraW : 0),
+      height: crop.height + (ky > 0 ? extraH : 0),
+    };
+    const oversampled = sampleImage(source, extendedCrop, W + kx, H + ky, options.sampling);
+    samples = quiltSeamless(oversampled, W + kx, H + ky, W, H);
   } else {
-    const pixelated = sampleImage(
-      source,
-      crop,
-      options.widthStitches,
-      options.heightRows,
-      options.sampling,
-    );
-    samples =
-      seamlessAxes.horizontal || seamlessAxes.vertical
-        ? makeSeamless(pixelated, options.widthStitches, options.heightRows, seamlessAxes)
-        : pixelated;
+    samples = sampleImage(source, crop, W, H, options.sampling);
+  }
+  // Any requested axis quilting couldn't handle gets the legacy adaptive blend instead.
+  const blendAxes = {
+    horizontal: seamlessAxes.horizontal && kx === 0,
+    vertical: seamlessAxes.vertical && ky === 0,
+  };
+  if (blendAxes.horizontal || blendAxes.vertical) {
+    samples = makeSeamless(samples, W, H, blendAxes);
   }
 
   const motifGrid: Grid =
