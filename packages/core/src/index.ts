@@ -81,7 +81,7 @@ export { encodeBase64Url, decodeBase64Url } from './pattern/base64url.js';
 export { serializeGrid, deserializeGrid, serializeNumberMap } from './pattern/gridJson.js';
 export type { GridJson } from './pattern/gridJson.js';
 
-export { applyColorEdits, isIdentityEdits } from './pattern/colorEdits.js';
+export { applyColorEdits, despeckleGrid, isIdentityEdits } from './pattern/colorEdits.js';
 export type { ColorEdit } from './pattern/colorEdits.js';
 
 export { buildPatternResult, buildYardageEstimate } from './pattern/patternResult.js';

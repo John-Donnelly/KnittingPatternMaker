@@ -95,7 +95,9 @@ export async function runPipeline(
     vertical: seamlessAxes.vertical && ky === 0,
   };
   if (blendAxes.horizontal || blendAxes.vertical) {
-    samples = makeSeamless(samples, W, H, blendAxes);
+    // Fallback blending only: keep the band tight — a wide cross-fade through discrete
+    // chart content reads as a smeared column at every tile join.
+    samples = makeSeamless(samples, W, H, { ...blendAxes, maxBandFraction: 0.1 });
   }
 
   const motifGrid: Grid =

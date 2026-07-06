@@ -4,6 +4,10 @@ import { labDistanceSq, rgbToLab } from '../color/lab.js';
 export interface SeamlessOptions {
   horizontal: boolean;
   vertical: boolean;
+  /** Cap on the blend band as a fraction of the axis (default 0.25). The pipeline passes a
+   * tighter cap when blending is only a fallback for un-quiltable images, where a wide
+   * blend reads as a smeared column through discrete chart content. */
+  maxBandFraction?: number | undefined;
 }
 
 /** Maps a user-facing {@link SeamlessMode} to the per-axis blend flags `makeSeamless` uses. */
@@ -45,11 +49,8 @@ function lerpColor(a: RGB, b: RGB, t: number): RGB {
   return { r: lerp(a.r, b.r, t), g: lerp(a.g, b.g, t), b: lerp(a.b, b.b, t) };
 }
 
-function maxBandForLength(length: number): number {
-  return Math.max(
-    1,
-    Math.min(Math.floor((length - 2) / 2), Math.round(length * MAX_BAND_FRACTION)),
-  );
+function maxBandForLength(length: number, fraction: number = MAX_BAND_FRACTION): number {
+  return Math.max(1, Math.min(Math.floor((length - 2) / 2), Math.round(length * fraction)));
 }
 
 /**
@@ -112,13 +113,13 @@ function blendAcrossWrap(line: readonly RGB[], bandInput: number): RGB[] {
  * sized independently by its own seam severity and then smoothed across neighboring lines so
  * the transition zone forms a coherent region instead of a ragged per-line comb.
  */
-function makeLinesSeamless(lines: readonly (readonly RGB[])[]): RGB[][] {
+function makeLinesSeamless(lines: readonly (readonly RGB[])[], maxBandFraction?: number): RGB[][] {
   const length = lines[0]?.length ?? 0;
   if (length < MIN_DIMENSION_FOR_BLEND) {
     return lines.map((line) => line.slice());
   }
 
-  const maxBand = maxBandForLength(length);
+  const maxBand = maxBandForLength(length, maxBandFraction);
   const bands = lines.map((line) => wrapBlendBand(line, maxBand));
   const smoothed = bands.map((_, i) => {
     const prev = bands[Math.max(0, i - 1)]!;
@@ -165,7 +166,7 @@ export function makeSeamless(
     for (let y = 0; y < height; y++) {
       rows.push(working.slice(y * width, y * width + width));
     }
-    const blended = makeLinesSeamless(rows);
+    const blended = makeLinesSeamless(rows, options.maxBandFraction);
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         working[y * width + x] = blended[y]![x]!;
@@ -182,7 +183,7 @@ export function makeSeamless(
       }
       cols.push(col);
     }
-    const blended = makeLinesSeamless(cols);
+    const blended = makeLinesSeamless(cols, options.maxBandFraction);
     for (let x = 0; x < width; x++) {
       for (let y = 0; y < height; y++) {
         working[y * width + x] = blended[x]![y]!;

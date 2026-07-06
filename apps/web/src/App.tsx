@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   applyColorEdits,
   buildPatternResult,
+  despeckleGrid,
   buildYardageEstimate,
   deserializeGrid,
   encodePatternSpec,
@@ -117,6 +118,8 @@ export function App() {
   /** Per-palette-color on/off/substitute edits, applied client-side to the generated grid.
    * Reset whenever a fresh pattern arrives. */
   const [colorEdits, setColorEdits] = useState<ColorEdit[] | null>(null);
+  /** Remove isolated single stitches (chart cleanup) — applied client-side like colorEdits. */
+  const [despeckle, setDespeckle] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -257,6 +260,7 @@ export function App() {
         if (!cancelled) {
           setResponse(res);
           setColorEdits(null);
+          setDespeckle(false);
         }
       })
       .catch((err: unknown) => {
@@ -356,7 +360,7 @@ export function App() {
   const view = useMemo(() => {
     if (!response) return null;
     const edits: ColorEdit[] = colorEdits ?? response.grid.palette.map(() => ({ enabled: true }));
-    if (isIdentityEdits(edits)) {
+    if (isIdentityEdits(edits) && !despeckle) {
       return {
         grid: response.grid,
         pattern: response.pattern,
@@ -367,12 +371,14 @@ export function App() {
     }
     const technique = response.resolvedOptions.technique;
     const gauge = response.resolvedOptions.gauge;
-    const grid = applyColorEdits(deserializeGrid(response.grid), edits);
+    let grid = deserializeGrid(response.grid);
+    if (!isIdentityEdits(edits)) grid = applyColorEdits(grid, edits);
+    if (despeckle) grid = despeckleGrid(grid);
     const pattern = buildPatternResult(technique, grid);
     const yardage = buildYardageEstimate(grid, gauge, pattern);
     const shareLink = encodePatternSpec({ technique, grid, ...(gauge ? { gauge } : {}) });
     return { grid: serializeGrid(grid), pattern, yardage, shareLink, edits };
-  }, [response, colorEdits]);
+  }, [response, colorEdits, despeckle]);
 
   if (route !== '/app') {
     return (
@@ -445,6 +451,17 @@ export function App() {
             {error && <p className="error">{error}</p>}
             {response && view && (
               <div className={loading ? 'results-wrap results-wrap--stale' : 'results-wrap'}>
+                <label className="field field--checkbox panel" style={{ marginBottom: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={despeckle}
+                    onChange={(e) => setDespeckle(e.target.checked)}
+                  />
+                  <span>
+                    Remove single stitches (despeckle) — merges isolated stitches into their
+                    surroundings for easier knitting
+                  </span>
+                </label>
                 <ResultView
                   grid={view.grid}
                   gauge={resolvedGauge}

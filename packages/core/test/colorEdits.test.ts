@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyColorEdits, isIdentityEdits } from '../src/pattern/colorEdits.js';
+import { applyColorEdits, despeckleGrid, isIdentityEdits } from '../src/pattern/colorEdits.js';
 import type { Grid } from '../src/types.js';
 
 const RED = { r: 200, g: 30, b: 30 };
@@ -76,5 +76,57 @@ describe('applyColorEdits', () => {
     const b = applyColorEdits(makeGrid(), edits);
     expect(a.palette).toEqual(b.palette);
     expect(Array.from(a.indices)).toEqual(Array.from(b.indices));
+  });
+});
+
+describe('despeckleGrid', () => {
+  it('replaces isolated single stitches with the majority neighbor color', () => {
+    // A lone RED cell in a WHITE field.
+    const grid: Grid = {
+      width: 3,
+      height: 3,
+      indices: Uint16Array.from([2, 2, 2, 2, 0, 2, 2, 2, 2]),
+      palette: [RED, BLUE, WHITE],
+    };
+    const out = despeckleGrid(grid);
+    expect(Array.from(out.indices)).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 2]);
+    expect(out.palette).toEqual(grid.palette); // palette (and indices meaning) untouched
+  });
+
+  it('keeps 2-stitch runs and never touches 1-row charts (too few neighbors to judge)', () => {
+    const run: Grid = {
+      width: 4,
+      height: 2,
+      indices: Uint16Array.from([2, 0, 0, 2, 2, 2, 2, 2]),
+      palette: [RED, BLUE, WHITE],
+    };
+    expect(Array.from(despeckleGrid(run).indices)).toEqual([2, 0, 0, 2, 2, 2, 2, 2]);
+
+    const strip: Grid = {
+      width: 4,
+      height: 1,
+      indices: Uint16Array.from([2, 0, 1, 2]),
+      palette: [RED, BLUE, WHITE],
+    };
+    expect(Array.from(despeckleGrid(strip).indices)).toEqual([2, 0, 1, 2]);
+  });
+
+  it('adjacent isolated cells both resolve from the ORIGINAL state (simultaneous pass)', () => {
+    // R and B sit side by side, each isolated; each sees the OTHER as it was, and both
+    // resolve to the surrounding white in one pass.
+    const rows = [
+      [2, 2, 2, 2],
+      [2, 0, 1, 2],
+      [2, 2, 2, 2],
+    ];
+    const grid: Grid = {
+      width: 4,
+      height: 3,
+      indices: Uint16Array.from(rows.flat()),
+      palette: [RED, BLUE, WHITE],
+    };
+    const out = despeckleGrid(grid);
+    expect(Array.from(out.indices)).toEqual([2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]);
+    expect(Array.from(despeckleGrid(grid).indices)).toEqual(Array.from(out.indices));
   });
 });

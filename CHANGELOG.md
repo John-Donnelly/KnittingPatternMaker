@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Despeckle toggle**: one checkbox removes isolated single stitches (cells whose neighbors
+  all differ merge into the majority neighbor color — the standard manual chart cleanup,
+  automated, simultaneous-pass deterministic). Applied client-side like the color edits, so
+  chart, instructions, yardage, exports, share links, and saves all reflect it instantly.
+
 ### Fixed
+
+- **Blend-fallback joins smeared up to a quarter of the motif.** When an axis can't be
+  quilted (chart scans whose crop spans the whole image), the legacy blend now runs with a
+  tight band cap (10% of the axis instead of 25%) — a wide cross-fade through discrete chart
+  content read as a smeared column at every tile join (user-reported).
 
 - **Seamless quilting squeezed every cell off the sampling grid.** The quilting integration
   sampled W+k cells across the SAME crop instead of extending it, so nothing aligned with a
