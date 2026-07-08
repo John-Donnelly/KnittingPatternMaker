@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **"A JAD Apps product" footer branding**, linking to jadapps.com. The four duplicated inline
+  footers were consolidated into a single `Footer` component so the credit and copyright live
+  in one place.
+
 ### Changed
 
 - **Larger patterns: `MAX_GRID_DIMENSION` raised 400 → 800** (an 800-stitch row is ~12 ft wide

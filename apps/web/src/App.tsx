@@ -372,9 +372,7 @@ export function App() {
           specBody={specBody}
           shareUrl={sharedView.shareUrl}
         />
-        <footer className="app__footer">
-          © 2026 Knitting Pattern Maker · Patterns you generate are yours to knit, gift, and sell.
-        </footer>
+        <Footer />
       </main>
     );
   }
@@ -388,9 +386,7 @@ export function App() {
       <main className="app">
         <Header auth={auth} onSignOut={signOut} />
         <LandingPage onGetStarted={() => navigate('/app')} />
-        <footer className="app__footer">
-          © 2026 Knitting Pattern Maker · Patterns you generate are yours to knit, gift, and sell.
-        </footer>
+        <Footer />
       </main>
     );
   }
@@ -406,9 +402,7 @@ export function App() {
             Sign in
           </a>
         </div>
-        <footer className="app__footer">
-          © 2026 Knitting Pattern Maker · Patterns you generate are yours to knit, gift, and sell.
-        </footer>
+        <Footer />
       </main>
     );
   }
@@ -501,10 +495,30 @@ export function App() {
       )}
 
       {auth?.authenticated && <MyPatterns refreshKey={savedRefresh} onOpen={openSavedPattern} />}
-      <footer className="app__footer">
-        © 2026 Knitting Pattern Maker · Patterns you generate are yours to knit, gift, and sell.
-      </footer>
+      <Footer />
     </main>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="app__footer">
+      <p className="app__footer-brand">
+        A{' '}
+        <a
+          className="app__footer-jad"
+          href="https://jadapps.com"
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          JAD Apps
+        </a>{' '}
+        product
+      </p>
+      <p>
+        © 2026 Knitting Pattern Maker · Patterns you generate are yours to knit, gift, and sell.
+      </p>
+    </footer>
   );
 }
 
