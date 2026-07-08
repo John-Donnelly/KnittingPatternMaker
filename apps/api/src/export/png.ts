@@ -3,7 +3,6 @@ import type { Grid } from 'knitting-pattern-core';
 
 const MAX_IMAGE_DIMENSION_PX = 2400;
 const MAX_CELL_SIZE_PX = 24;
-const MIN_CELL_SIZE_PX = 4;
 const GRID_LINE_MIN_CELL_SIZE_PX = 6;
 const MAJOR_GRID_LINE_EVERY = 10;
 
@@ -12,8 +11,11 @@ const MAJOR_GRID_LINE_COLOR = { r: 90, g: 90, b: 90 };
 
 function chartCellSizePx(grid: Grid): number {
   const largestDimension = Math.max(grid.width, grid.height);
+  // Floor of 1 (not a larger minimum) so MAX_IMAGE_DIMENSION_PX is a *hard* cap on output size
+  // and memory at any grid dimension. Large charts get small cells (no gridlines); the PDF is
+  // the detailed printable artifact.
   const fitted = Math.floor(MAX_IMAGE_DIMENSION_PX / largestDimension);
-  return Math.max(MIN_CELL_SIZE_PX, Math.min(MAX_CELL_SIZE_PX, fitted));
+  return Math.max(1, Math.min(MAX_CELL_SIZE_PX, fitted));
 }
 
 function setPixel(

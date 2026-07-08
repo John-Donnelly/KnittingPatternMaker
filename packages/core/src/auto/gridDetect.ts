@@ -1,4 +1,5 @@
 import type { CropRect, PixelBuffer } from '../types.js';
+import { MAX_GRID_DIMENSION } from '../limits.js';
 
 /**
  * Detectors for images that are pictures OF pixel grids, where the right conversion is
@@ -38,7 +39,9 @@ const MIN_PITCH = 4;
 const MIN_LINES = 8;
 /** Fraction of chain positions that must actually hold a line (tolerates a few faint ones). */
 const MIN_CHAIN_DENSITY = 0.75;
-const MAX_CELLS = 400;
+/** Cap on detected chart cells per axis — tracks the output grid limit so a large source chart
+ * can be reproduced at its native cell resolution. */
+const MAX_CELLS = MAX_GRID_DIMENSION;
 
 interface AxisChain {
   /** Refined pitch: physical chain span / step count (immune to per-step rounding drift). */

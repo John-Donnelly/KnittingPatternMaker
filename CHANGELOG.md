@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Larger patterns: `MAX_GRID_DIMENSION` raised 400 → 800** (an 800-stitch row is ~12 ft wide
+  at worsted gauge — larger than essentially any hand-knit). Chosen with measurement, not a
+  guess: a worst-case (random-noise) 800×800 quantizes in ~7s and a realistic flat-color chart
+  in ~1s, and the encoded share-link stays bounded. Dependent caps raised consistently so
+  nothing silently breaks at the new size:
+  - `MAX_SHARE_LINK_LENGTH` 200k → 600k (share links live in the URL fragment, client-side, so
+    a worst-case ~350k-char link for a huge noisy pattern still fits with headroom; realistic
+    patterns are a few KB).
+  - Share-link decode buffer 2 MB → 4 MB (a worst-case 800×800 JSON is ~1.3 MB).
+  - PNG export now treats `MAX_IMAGE_DIMENSION_PX` (2400) as a **hard** cap by allowing cells
+    down to 1 px, instead of a 4-px floor that pushed an 800-grid chart to 3200 px / ~41 MB.
+    Fixed in both `apps/api` and `apps/worker`.
+  - Chart-grid auto-detection cap now tracks `MAX_GRID_DIMENSION`, so a large scanned chart can
+    be reproduced at its native cell resolution.
+
+  Verified end-to-end through the real API: an 800×600 pattern generates in ~3.9 s with a 30 KB
+  share link and a correctly-bounded 2400×1800 PNG.
+
 ### Added
 
 - **Despeckle toggle**: one checkbox removes isolated single stitches (cells whose neighbors

@@ -26,12 +26,12 @@ const KNOWN_TECHNIQUES: readonly Technique[] = ['stranded', 'intarsia', 'texture
 
 /**
  * Hard cap on decompressed bytes, enforced by decompressing into a fixed-size buffer. A
- * MAX_GRID_DIMENSION x MAX_GRID_DIMENSION, MAX_COLORS pattern's JSON is well under 1MB even
- * uncompressed, so this has generous headroom for legitimate patterns while bounding a
- * maliciously crafted link (deflate can expand highly repetitive input by orders of magnitude)
- * to a small, fixed amount of memory instead of however large the attacker wants.
+ * worst-case (noisy) MAX_GRID_DIMENSION x MAX_GRID_DIMENSION, MAX_COLORS pattern's JSON is
+ * ~1.3MB uncompressed, so 4MB gives generous headroom for legitimate patterns while still
+ * bounding a maliciously crafted link (deflate can expand highly repetitive input by orders of
+ * magnitude) to a small, fixed amount of memory instead of however large the attacker wants.
  */
-const MAX_DECOMPRESSED_BYTES = 2 * 1024 * 1024;
+const MAX_DECOMPRESSED_BYTES = 4 * 1024 * 1024;
 
 interface SerializedSpecV1 {
   v: 1;

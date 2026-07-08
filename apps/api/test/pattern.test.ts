@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { FastifyInstance } from 'fastify';
+import { MAX_GRID_DIMENSION } from 'knitting-pattern-core';
 import { buildServer } from '../src/server.js';
 import {
   makeColorBandsPng,
@@ -172,15 +173,17 @@ describe('POST /api/pattern', () => {
 
   it('rejects a repeat that would exceed the max grid dimension', async () => {
     const image = await makeTestImagePng(20, 20);
+    // Pick a motif width and repeat whose product exceeds the limit, whatever the limit is.
+    const widthStitches = Math.ceil(MAX_GRID_DIMENSION * 0.6); // motif itself is within the limit
     const res = await request(app.server)
       .post('/api/pattern')
       .field(
         'options',
         JSON.stringify({
           technique: 'intarsia',
-          widthStitches: 200,
+          widthStitches,
           heightRows: 10,
-          repeat: { across: 3, down: 1 }, // 200*3 = 600 > 400
+          repeat: { across: 2, down: 1 }, // width * 2 > MAX_GRID_DIMENSION
         }),
       )
       .attach('image', image, 'test.png');

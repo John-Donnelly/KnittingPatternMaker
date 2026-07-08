@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MAX_GRID_DIMENSION } from 'knitting-pattern-core';
 import { ControlsPanel, type FormState } from '../src/components/ControlsPanel.js';
 
 function baseForm(overrides: Partial<FormState> = {}): FormState {
@@ -91,17 +92,15 @@ describe('ControlsPanel', () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ technique: 'intarsia' }));
   });
 
-  it('clamps width/height input to the valid range', async () => {
-    const user = userEvent.setup();
+  it('clamps width/height input to the valid range', () => {
     const onChange = vi.fn();
     render(<ControlsPanel value={baseForm()} onChange={onChange} />);
 
-    const widthInput = screen.getByLabelText('Width (stitches)');
-    await user.clear(widthInput);
-    await user.type(widthInput, '99999');
+    // A single deterministic change past the limit clamps to MAX_GRID_DIMENSION.
+    fireEvent.change(screen.getByLabelText('Width (stitches)'), { target: { value: '99999' } });
 
     const lastCall = onChange.mock.calls.at(-1)?.[0] as FormState;
-    expect(lastCall.widthStitches).toBe(400);
+    expect(lastCall.widthStitches).toBe(MAX_GRID_DIMENSION);
   });
 
   it('changes the seamless join direction via the select', async () => {
