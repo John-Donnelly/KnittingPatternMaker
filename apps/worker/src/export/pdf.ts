@@ -560,7 +560,7 @@ const TECHNIQUE_LABEL: Record<Technique, string> = {
  * decorated pattern name degrades gracefully instead of failing the whole export. */
 function sanitizeWinAnsi(text: string): string {
   return text
-    .replace(/[^ -~ -ÿ]/g, '')
+    .replace(/[^\x20-\x7e\u00a0-\u00ff]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }

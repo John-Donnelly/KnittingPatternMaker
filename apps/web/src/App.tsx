@@ -316,6 +316,35 @@ export function App() {
     window.scrollTo({ top: 0 });
   };
 
+  // Apply any per-color edits CLIENT-SIDE: the edited grid feeds the same pure core
+  // functions the share-link view uses, so chart, instructions, yardage, exports, share
+  // links, and saves all reflect the edits with no server round trip.
+  //
+  // Declared before every early return so this hook is called unconditionally on every render
+  // (rules-of-hooks); it no-ops to null until a response exists.
+  const view = useMemo(() => {
+    if (!response) return null;
+    const edits: ColorEdit[] = colorEdits ?? response.grid.palette.map(() => ({ enabled: true }));
+    if (isIdentityEdits(edits) && !despeckle) {
+      return {
+        grid: response.grid,
+        pattern: response.pattern,
+        yardage: response.yardage,
+        shareLink: response.shareLink,
+        edits,
+      };
+    }
+    const technique = response.resolvedOptions.technique;
+    const gauge = response.resolvedOptions.gauge;
+    let grid = deserializeGrid(response.grid);
+    if (!isIdentityEdits(edits)) grid = applyColorEdits(grid, edits);
+    if (despeckle) grid = despeckleGrid(grid);
+    const pattern = buildPatternResult(technique, grid);
+    const yardage = buildYardageEstimate(grid, gauge, pattern);
+    const shareLink = encodePatternSpec({ technique, grid, ...(gauge ? { gauge } : {}) });
+    return { grid: serializeGrid(grid), pattern, yardage, shareLink, edits };
+  }, [response, colorEdits, despeckle]);
+
   if (sharedView) {
     const specBody: PatternSpecBody = {
       technique: sharedView.technique,
@@ -353,32 +382,6 @@ export function App() {
   // Ground the result view in what the pattern was actually generated with (the response's
   // resolved options), not the possibly-not-yet-submitted form state.
   const resolvedGauge = response?.resolvedOptions.gauge;
-
-  // Apply any per-color edits CLIENT-SIDE: the edited grid feeds the same pure core
-  // functions the share-link view uses, so chart, instructions, yardage, exports, share
-  // links, and saves all reflect the edits with no server round trip.
-  const view = useMemo(() => {
-    if (!response) return null;
-    const edits: ColorEdit[] = colorEdits ?? response.grid.palette.map(() => ({ enabled: true }));
-    if (isIdentityEdits(edits) && !despeckle) {
-      return {
-        grid: response.grid,
-        pattern: response.pattern,
-        yardage: response.yardage,
-        shareLink: response.shareLink,
-        edits,
-      };
-    }
-    const technique = response.resolvedOptions.technique;
-    const gauge = response.resolvedOptions.gauge;
-    let grid = deserializeGrid(response.grid);
-    if (!isIdentityEdits(edits)) grid = applyColorEdits(grid, edits);
-    if (despeckle) grid = despeckleGrid(grid);
-    const pattern = buildPatternResult(technique, grid);
-    const yardage = buildYardageEstimate(grid, gauge, pattern);
-    const shareLink = encodePatternSpec({ technique, grid, ...(gauge ? { gauge } : {}) });
-    return { grid: serializeGrid(grid), pattern, yardage, shareLink, edits };
-  }, [response, colorEdits, despeckle]);
 
   if (route !== '/app') {
     return (

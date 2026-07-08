@@ -6,7 +6,15 @@ import reactHooks from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/build/**', '**/coverage/**', '**/node_modules/**', '**/*.d.ts'],
+    ignores: [
+      '**/dist/**',
+      '**/build/**',
+      '**/coverage/**',
+      '**/node_modules/**',
+      '**/*.d.ts',
+      // Cloudflare Workers local build cache / generated bundles — not our source.
+      '**/.wrangler/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
