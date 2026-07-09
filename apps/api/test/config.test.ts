@@ -15,9 +15,9 @@ describe('loadConfig production guards', () => {
 
   it('fails fast when PUBLIC_URL is left at the localhost default in production', () => {
     delete process.env.PUBLIC_URL;
-    expect(() =>
-      loadConfig({ nodeEnv: 'production', sessionSecret: 'x'.repeat(32) }),
-    ).toThrow(ConfigError);
+    expect(() => loadConfig({ nodeEnv: 'production', sessionSecret: 'x'.repeat(32) })).toThrow(
+      ConfigError,
+    );
     expect(() => loadConfig({ nodeEnv: 'production', sessionSecret: 'x'.repeat(32) })).toThrow(
       /PUBLIC_URL/,
     );

@@ -19,6 +19,7 @@ jobs:
 
       - run: npm ci
       - run: npm run lint
+      - run: npm run format:check
       - run: npm run typecheck
       - run: npm run build
       # Validate the Cloudflare Worker bundles (it packages apps/web/dist, so it runs after the
