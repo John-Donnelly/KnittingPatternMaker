@@ -120,6 +120,48 @@ describe('POST /api/export/pdf', () => {
     expect(pageCounts[1]).toBe(pageCounts[2]);
   });
 
+  it('renders a large grid as a single raster overview page instead of OOM-ing on per-cell vectors', async () => {
+    // Regression: raising MAX_GRID_DIMENSION to 800 made drawChart emit one vector rect + glyph
+    // per cell. pdf-lib buffers every operator, so a 200x200 (40k-cell) grid — let alone 800x800
+    // — exhausted heap / tiled into ~150 pages / took ~50s. Grids over VECTOR_CELL_CAP (30k) now
+    // take a single embedded-PNG overview page. Guard: it completes fast (default 5s test
+    // timeout catches the old 50s path), stays a modest page count, and embeds the raster.
+    const { PDFDocument } = await import('pdf-lib');
+    const size = 200; // 40,000 cells > VECTOR_CELL_CAP
+    const indices = Array.from({ length: size * size }, (_, i) => (i % size < size / 2 ? 0 : 1));
+    const res = await request(app.server)
+      .post('/api/export/pdf')
+      .send({
+        technique: 'stranded' as const,
+        gauge: { stitchesPer4In: 22, rowsPer4In: 30 },
+        grid: {
+          width: size,
+          height: size,
+          indices,
+          palette: [
+            { r: 20, g: 20, b: 20 },
+            { r: 235, g: 235, b: 235 },
+          ],
+        },
+      })
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk: Buffer) => chunks.push(chunk));
+        response.on('end', () => callback(null, Buffer.concat(chunks)));
+      });
+
+    expect(res.status).toBe(200);
+    const body = res.body as Buffer;
+    expect(body.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    // The overview path embeds one bounded PNG image XObject; the per-cell vector path embeds none.
+    expect(body.toString('latin1')).toMatch(/\/Subtype\s*\/Image/);
+    // A 200x200 vector chart would tile into many chart pages; the overview is a single page, so
+    // the whole document stays well under what tiling would produce.
+    const doc = await PDFDocument.load(new Uint8Array(body));
+    expect(doc.getPageCount()).toBeLessThan(20);
+  });
+
   it('rejects a grid with mismatched index length', async () => {
     const body = samplePatternSpecBody();
     body.grid.indices = body.grid.indices.slice(0, 5);

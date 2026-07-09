@@ -16,6 +16,13 @@ import { registerAuthRoutes, requireAuth } from './routes/auth.js';
 import { registerPatternsRoutes } from './routes/patterns.js';
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+/**
+ * JSON body cap for the export/save endpoints, which receive a full serialized grid. A
+ * worst-case MAX_GRID_DIMENSION^2 (640k-index) grid serializes to ~2 MB of JSON, so 8 MB gives
+ * comfortable headroom while still bounding memory. (Image uploads are multipart, capped
+ * separately by MAX_UPLOAD_BYTES.)
+ */
+const MAX_JSON_BODY_BYTES = 8 * 1024 * 1024;
 
 /** Paths gated behind sign-in when AUTH_REQUIRED is on (the compute-heavy endpoints). */
 const PROTECTED_PREFIXES = ['/api/pattern', '/api/export/'];
@@ -25,6 +32,7 @@ export function buildServer(configOverrides: Parameters<typeof loadConfig>[0] = 
   const db = openDatabase(config.effectiveDataDir);
 
   const app = Fastify({
+    bodyLimit: MAX_JSON_BODY_BYTES,
     logger: {
       level: config.logLevel,
       // Never log cookie/authorization values.

@@ -20,9 +20,20 @@ import {
   type Technique,
   type YardageEstimate,
 } from 'knitting-pattern-core';
+import { renderChartPng } from './chartPng.js';
 
 const MARGIN = 36;
 const [PAGE_WIDTH, PAGE_HEIGHT] = PageSizes.Letter;
+
+/**
+ * Above this many stitches, the chart is drawn as an embedded raster (one bounded PNG) instead
+ * of one vector rectangle + glyph per cell. pdf-lib buffers every operator in memory before
+ * serializing, so per-cell vectors are O(cells) memory and time — a full 800x800 grid (640k
+ * cells) exhausts heap. The raster path keeps numbering and gridlines but replaces the interior
+ * fills with an image whose size the PNG renderer already bounds. Chosen well below the measured
+ * danger zone. Keep in sync with apps/api/src/export/pdf.ts.
+ */
+const VECTOR_CELL_CAP = 30_000;
 
 function toPdfColor(color: RGB): PdfRgb {
   return rgb(color.r / 255, color.g / 255, color.b / 255);
@@ -196,12 +207,116 @@ function symbolInk(cell: RGB): PdfRgb {
   return relativeLuminance(cell) > 0.35 ? rgb(0.08, 0.08, 0.08) : rgb(0.97, 0.97, 0.97);
 }
 
-function drawChart(
+/**
+ * Single-page raster overview for grids too large to draw cell-by-cell. Renders the whole chart
+ * as one bounded PNG (fast, memory-safe) fitted to the page with gauge-correct proportions,
+ * light guide lines and numbering every 25, and a note pointing to the written instructions and
+ * the full-resolution PNG export for exact per-stitch detail. This is what keeps an 800x800
+ * chart from emitting 640k vector operators (which exhausted heap) or tiling into ~150 pages.
+ */
+async function drawChartOverview(
+  writer: PdfWriter,
+  grid: Grid,
+  gauge: GaugeSpec | undefined,
+): Promise<void> {
+  writer.newPage();
+  writer.page.drawText('Chart (overview)', {
+    x: MARGIN,
+    y: PAGE_HEIGHT - MARGIN - 14,
+    size: 12,
+    font: writer.boldFont,
+    color: INK,
+  });
+  writer.y = PAGE_HEIGHT - MARGIN - CHART_HEADER_H;
+  writer.paragraph(
+    `This ${grid.width} x ${grid.height} chart is too large to print cell-by-cell, so it is shown here as a single scaled image. Work from the row-by-row instructions for exact stitches, and use the downloadable chart PNG for a full-resolution view.`,
+    { color: MUTED, size: 9.5 },
+  );
+
+  const aspect = stitchAspectRatio(gauge);
+  const chartTop = writer.y - 4;
+  const availW = PAGE_WIDTH - MARGIN * 2 - ROW_LABEL_W * 2;
+  const availH = chartTop - MARGIN;
+  // Gauge-corrected display aspect (stitches are wider than tall), fit inside the available box.
+  const targetAspect = (grid.width * aspect) / grid.height;
+  let dispW = availW;
+  let dispH = dispW / targetAspect;
+  if (dispH > availH) {
+    dispH = availH;
+    dispW = dispH * targetAspect;
+  }
+  const originX = MARGIN + ROW_LABEL_W;
+  const bottomY = chartTop - dispH;
+
+  const png = await writer.doc.embedPng(renderChartPng(grid));
+  writer.page.drawImage(png, { x: originX, y: bottomY, width: dispW, height: dispH });
+  writer.page.drawRectangle({
+    x: originX,
+    y: bottomY,
+    width: dispW,
+    height: dispH,
+    borderColor: rgb(0.5, 0.5, 0.5),
+    borderWidth: 0.7,
+  });
+
+  // Coarse numbering + guide lines every 25 stitches/rows (counted from right/bottom to match
+  // the chart-reading convention), so the overview is still navigable.
+  const cw = dispW / grid.width;
+  const ch = dispH / grid.height;
+  const guide = rgb(0.4, 0.4, 0.4);
+  for (let gx = 0; gx <= grid.width; gx++) {
+    const fromRight = grid.width - gx;
+    if (fromRight % 25 !== 0) continue;
+    const x = originX + gx * cw;
+    writer.page.drawLine({
+      start: { x, y: bottomY },
+      end: { x, y: bottomY + dispH },
+      thickness: 0.3,
+      color: guide,
+    });
+    const label = String(fromRight);
+    writer.page.drawText(label, {
+      x: x - writer.font.widthOfTextAtSize(label, 6) / 2,
+      y: chartTop + 3,
+      size: 6,
+      font: writer.font,
+      color: MUTED,
+    });
+  }
+  for (let gy = 0; gy <= grid.height; gy++) {
+    const fromBottom = grid.height - gy; // chart row 1 at the bottom
+    if (fromBottom % 25 !== 0) continue;
+    const y = bottomY + gy * ch;
+    writer.page.drawLine({
+      start: { x: originX, y },
+      end: { x: originX + dispW, y },
+      thickness: 0.3,
+      color: guide,
+    });
+    const label = String(fromBottom);
+    writer.page.drawText(label, {
+      x: MARGIN + ROW_LABEL_W - 4 - writer.font.widthOfTextAtSize(label, 6),
+      y: y - 3,
+      size: 6,
+      font: writer.font,
+      color: MUTED,
+    });
+  }
+}
+
+async function drawChart(
   writer: PdfWriter,
   grid: Grid,
   gauge: GaugeSpec | undefined,
   technique: Technique,
-): void {
+): Promise<void> {
+  // Grids too large to draw one vector rectangle + glyph per cell (which exhausts pdf-lib's
+  // in-memory operator buffer, and would tile into an absurd page count) get a single-page
+  // raster overview instead; exact stitches come from the written instructions + PNG export.
+  if (grid.width * grid.height > VECTOR_CELL_CAP) {
+    await drawChartOverview(writer, grid, gauge);
+    return;
+  }
   // Row numbers live on BOTH sides (RS rows on the right, WS rows on the left — standard
   // flat-chart convention), so reserve a label gutter on each side.
   const availableW = PAGE_WIDTH - MARGIN * 2 - ROW_LABEL_W * 2;
@@ -600,7 +715,7 @@ export async function renderPatternPdf(input: PdfPatternInput): Promise<Uint8Arr
   writer.spacer(10);
   drawLegend(writer, input.grid, input.yardage, input.technique);
 
-  drawChart(writer, input.grid, input.gauge, input.technique);
+  await drawChart(writer, input.grid, input.gauge, input.technique);
 
   writer.newPage();
   drawInstructions(writer, input.pattern);

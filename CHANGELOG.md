@@ -42,6 +42,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Large charts no longer exhaust memory on PDF export.** Raising the grid limit to 800 let
+  `drawChart` emit one vector rectangle + glyph per cell; pdf-lib buffers every operator, so a
+  full 800×800 (640k-cell) chart exhausted heap (and a first raster attempt tiled into ~150
+  high-resolution pages, ~50 s). Charts over 30k cells now render as a single embedded-PNG
+  **overview page** — gauge-correct proportions, guide lines and numbering every 25 — with the
+  exact per-stitch detail coming from the row-by-row instructions and the full-resolution PNG
+  export. Verified end-to-end: an 800×800 PDF now exports in ~1.4 s (was an OOM crash). Fixed in
+  both `apps/api` and `apps/worker`. The export endpoint's JSON body limit was also raised to
+  8 MB so a full-size serialized grid isn't rejected with a 413.
 - **Un-quiltable joins now splice the motif's own interior across the seam** (full
   Efros-Freeman): when the crop can't extend for continuation content, the interior strip
   whose halves best match the two edges is seam-cut into them, so the tiled join shows real
