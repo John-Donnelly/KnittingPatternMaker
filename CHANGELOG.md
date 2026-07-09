@@ -52,6 +52,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the quantize and both dither hot loops. Measured on a 400×400 noisy gradient: no-dither
   3.4 s → 1.9 s, Floyd–Steinberg 3.9 s → 2.5 s, with matching output checksums.
 
+### Changed
+
+- **Production config fails fast on a missing `PUBLIC_URL`** instead of silently defaulting to
+  `http://localhost:4000` — a wrong public origin breaks auth redirects and the production CORS
+  allow-list, so it's better caught at boot than in the field.
+- **Graceful shutdown now has a 10 s timeout.** If `close()` stalls on a stuck connection the
+  process force-exits rather than hanging until the orchestrator's SIGKILL.
+- **Removed the unused `pino-pretty` production dependency** (nothing configured it as a logger
+  transport), trimming the production install.
+
 ### Added
 
 - **Accessibility & resilience pass:**

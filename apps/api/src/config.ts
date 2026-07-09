@@ -1,6 +1,9 @@
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 
+/** Dev/test default for the public origin; treated as "unset" when validating production. */
+const PUBLIC_URL_DEFAULT = 'http://localhost:4000';
+
 /**
  * All runtime configuration, read once from the environment and validated. Tests can pass
  * overrides to `buildServer` instead of mutating `process.env`.
@@ -25,7 +28,7 @@ const ConfigSchema = z.object({
   oidcRedirectUri: z.url().optional(),
 
   /** Public origin of the deployed app (used for auth redirects), e.g. https://knit.example.com */
-  publicUrl: z.url().default('http://localhost:4000'),
+  publicUrl: z.url().default(PUBLIC_URL_DEFAULT),
 
   /** When true, pattern/export endpoints require a signed-in session (needs OIDC configured). */
   authRequired: z.coerce.boolean().default(false),
@@ -84,6 +87,12 @@ export function loadConfig(overrides: Partial<z.input<typeof ConfigSchema>> = {}
   if (cfg.nodeEnv === 'production') {
     if (!cfg.sessionSecret) {
       throw new ConfigError('SESSION_SECRET (>= 32 chars) is required in production');
+    }
+    // publicUrl drives auth redirects and the production CORS allow-list. Leaving it at the
+    // localhost default in production silently breaks sign-in and cross-origin calls, so fail
+    // fast instead of shipping a misconfigured origin.
+    if (cfg.publicUrl === PUBLIC_URL_DEFAULT) {
+      throw new ConfigError('PUBLIC_URL must be set to the public origin in production');
     }
     if (cfg.authRequired && !oidcEnabled) {
       throw new ConfigError(
