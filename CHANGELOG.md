@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **"A JAD Apps product" footer branding**, linking to jadapps.com. The four duplicated inline
   footers were consolidated into a single `Footer` component so the credit and copyright live
   in one place.
+- **LICENSE** (proprietary — © 2026 JAD Apps, all rights reserved) plus a `license: "UNLICENSED"`
+  field on the root package, and a **PRIVACY.md** grounded in the code's actual data handling
+  (uploaded images processed in memory and never stored, no analytics or third-party tracking,
+  accounts and saved patterns only under optional SSO). PRIVACY.md carries a few clearly-marked
+  operational placeholders — contact email, hosting region, jurisdiction — to fill in at publish.
 
 ### Changed
 

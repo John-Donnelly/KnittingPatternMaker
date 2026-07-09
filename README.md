@@ -130,3 +130,12 @@ only touches three spots:
 3. **Webhook**: add `POST /api/billing/webhook` (verify with `STRIPE_WEBHOOK_SECRET`) that
    flips `users.plan` on `checkout.session.completed` / subscription events. Gate premium
    features by reading `plan` where `requireAuth` already runs.
+
+## License & privacy
+
+Proprietary — © 2026 JAD Apps, all rights reserved. See [LICENSE](LICENSE).
+
+[PRIVACY.md](PRIVACY.md) describes how the Service handles data: uploaded images are processed in
+memory and never stored, there is no analytics or third-party tracking, and accounts/saved
+patterns exist only when SSO sign-in is enabled. A few operational placeholders (contact email,
+hosting region, jurisdiction) must be filled in before publishing it.
