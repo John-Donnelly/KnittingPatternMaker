@@ -33,6 +33,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Verified end-to-end through the real API: an 800×600 pattern generates in ~3.9 s with a 30 KB
   share link and a correctly-bounded 2400×1800 PNG.
 
+### Security
+
+- **The Node API now rejects images over 12 megapixels before decoding** (sharp's
+  `limitInputPixels`), matching the Cloudflare Worker's existing image-header pre-check.
+  Previously a decompression bomb — a tiny compressed file with enormous pixel dimensions —
+  could force a multi-hundred-MB RGBA allocation on the server (a 25 MP / ~340 KB PNG decoded to
+  100 MB). The shared cap now lives in `packages/core/src/limits.ts` so the two backends can't
+  drift apart.
+- **Removed the committed SQLite dev database from version control.** It had been tracked before
+  the `data/` gitignore rule landed; local databases are recreated on first run.
+
 ### Added
 
 - **Despeckle toggle**: one checkbox removes isolated single stitches (cells whose neighbors

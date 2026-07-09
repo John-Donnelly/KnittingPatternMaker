@@ -11,6 +11,7 @@ import {
   quiltWrapPatch,
   resolveAutoOptions,
   sampleImage,
+  MAX_IMAGE_MEGAPIXELS,
   seamlessModeToOptions,
   quantizeGrid,
   quantizeTexture,
@@ -38,7 +39,12 @@ export class InvalidImageError extends Error {}
  */
 export async function decodeImage(buffer: Buffer): Promise<PixelBuffer> {
   try {
-    const { data, info } = await sharp(buffer)
+    // limitInputPixels rejects a decompression bomb (tiny file, enormous dimensions) during
+    // decode instead of allocating a multi-hundred-MB RGBA plane. Mirrors the Worker's 12 MP
+    // header pre-check so both backends behave identically.
+    const { data, info } = await sharp(buffer, {
+      limitInputPixels: MAX_IMAGE_MEGAPIXELS * 1_000_000,
+    })
       .rotate()
       .ensureAlpha()
       .raw()
@@ -50,9 +56,14 @@ export async function decodeImage(buffer: Buffer): Promise<PixelBuffer> {
       data: Uint8ClampedArray.from(data),
     };
   } catch (err) {
-    throw new InvalidImageError(
-      `Could not decode image: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    const message = err instanceof Error ? err.message : String(err);
+    // sharp throws "Input image exceeds pixel limit" when limitInputPixels is exceeded.
+    if (/pixel limit/i.test(message)) {
+      throw new InvalidImageError(
+        `Image is too large (max ${MAX_IMAGE_MEGAPIXELS} megapixels). Downscale it and try again.`,
+      );
+    }
+    throw new InvalidImageError(`Could not decode image: ${message}`);
   }
 }
 

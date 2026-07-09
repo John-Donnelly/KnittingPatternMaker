@@ -14,7 +14,7 @@ import JPEG_DEC_WASM from '../../../node_modules/@jsquash/jpeg/codec/dec/mozjpeg
 import PNG_DEC_WASM from '../../../node_modules/@jsquash/png/codec/pkg/squoosh_png_bg.wasm';
 import WEBP_DEC_WASM from '../../../node_modules/@jsquash/webp/codec/dec/webp_dec.wasm';
 import exifr from 'exifr';
-import type { PixelBuffer } from 'knitting-pattern-core';
+import { MAX_IMAGE_MEGAPIXELS, type PixelBuffer } from 'knitting-pattern-core';
 
 export class ImageDecodeError extends Error {}
 
@@ -22,8 +22,8 @@ export class ImageDecodeError extends Error {}
  * plane is 4 bytes/px (48MB at 12MP) and the pipeline's sampling/auto stages allocate
  * several further passes over it — 12MP keeps peak usage safely inside the 128MB isolate.
  * The frontend downscales client-side to a 3000px long edge (9MP); this is the backstop for
- * direct API callers. */
-export const MAX_MEGAPIXELS = 12;
+ * direct API callers. Shared with the Node API via core so both backends agree. */
+export const MAX_MEGAPIXELS = MAX_IMAGE_MEGAPIXELS;
 
 let wasmReady: Promise<void> | null = null;
 function ensureWasm(): Promise<void> {

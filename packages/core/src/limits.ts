@@ -14,6 +14,17 @@ export const MAX_GRID_DIMENSION = 800;
 export const MAX_COLORS = 40;
 
 /**
+ * Largest uploaded image accepted (in megapixels) before it is decoded to a raw RGBA plane.
+ * A decompression bomb — a tiny compressed file with enormous pixel dimensions — would
+ * otherwise force a width*height*4-byte allocation; 12 MP is ~48 MB, a safe universal backstop.
+ * Both the Node API (sharp's `limitInputPixels`) and the Cloudflare Worker (an image-header
+ * pre-check) enforce this. The frontend downscales to a ~9 MP long edge before upload, so this
+ * only bites direct API callers. Downstream sampling only ever reads a crop at <= the grid size,
+ * so a larger source buys nothing.
+ */
+export const MAX_IMAGE_MEGAPIXELS = 12;
+
+/**
  * Upper bound on an encoded share-link token's length, checked *before* attempting to
  * decompress it. Share links live in the URL fragment (never sent to a server), so a large
  * value is safe for the browser; the cap exists because deflate can expand a small malicious

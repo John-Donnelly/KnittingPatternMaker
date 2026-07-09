@@ -1,7 +1,12 @@
 export const CORE_VERSION = '0.1.0';
 
 export * from './types.js';
-export { MAX_GRID_DIMENSION, MAX_COLORS, MAX_SHARE_LINK_LENGTH } from './limits.js';
+export {
+  MAX_GRID_DIMENSION,
+  MAX_COLORS,
+  MAX_SHARE_LINK_LENGTH,
+  MAX_IMAGE_MEGAPIXELS,
+} from './limits.js';
 
 export { rgbToLab, labDistanceSq, relativeLuminance } from './color/lab.js';
 export type { Lab } from './color/lab.js';
