@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { nearestColorIndex } from '../src/color/nearest.js';
+import { makeNearestColorMapper, nearestColorIndex } from '../src/color/nearest.js';
+import type { RGB } from '../src/types.js';
 
 describe('nearestColorIndex', () => {
   it('throws for an empty palette', () => {
@@ -50,6 +51,33 @@ describe('nearestColorIndex', () => {
     const first = nearestColorIndex(color, palette);
     for (let i = 0; i < 20; i++) {
       expect(nearestColorIndex(color, palette)).toBe(first);
+    }
+  });
+});
+
+describe('makeNearestColorMapper', () => {
+  it('throws for an empty palette, like the single-shot form', () => {
+    expect(() => makeNearestColorMapper([])).toThrow();
+  });
+
+  it('returns byte-identical indices to nearestColorIndex across many colors', () => {
+    // The perf optimization must not change output: exercise a full palette against a dense,
+    // deterministic sweep of query colors and require the cached mapper to agree everywhere.
+    const palette: RGB[] = Array.from({ length: 40 }, (_, i) => ({
+      r: (i * 97) % 256,
+      g: (i * 53 + 20) % 256,
+      b: (i * 29 + 128) % 256,
+    }));
+    const nearest = makeNearestColorMapper(palette);
+    let s = 987654321;
+    const rnd = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    for (let i = 0; i < 5000; i++) {
+      const color: RGB = {
+        r: Math.floor(rnd() * 256),
+        g: Math.floor(rnd() * 256),
+        b: Math.floor(rnd() * 256),
+      };
+      expect(nearest(color)).toBe(nearestColorIndex(color, palette));
     }
   });
 });

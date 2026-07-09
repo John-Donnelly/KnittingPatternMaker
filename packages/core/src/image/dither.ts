@@ -1,5 +1,5 @@
 import type { RGB } from '../types.js';
-import { nearestColorIndex } from '../color/nearest.js';
+import { makeNearestColorMapper } from '../color/nearest.js';
 
 /** Standard 4x4 ordered (Bayer) dither threshold matrix, values 0-15. */
 const BAYER_4X4: readonly (readonly number[])[] = [
@@ -28,6 +28,7 @@ export function ditherBayer4(
   // nudge to cross into a neighboring bucket.
   const amplitude = 255 / (palette.length + 1);
   const indices = new Uint16Array(width * height);
+  const nearest = makeNearestColorMapper(palette);
 
   for (let y = 0; y < height; y++) {
     const bayerRow = BAYER_4X4[y % 4];
@@ -41,7 +42,7 @@ export function ditherBayer4(
         g: clamp255(sample.g + t * amplitude),
         b: clamp255(sample.b + t * amplitude),
       };
-      indices[y * width + x] = nearestColorIndex(perturbed, palette);
+      indices[y * width + x] = nearest(perturbed);
     }
   }
 
@@ -71,6 +72,7 @@ export function ditherFloydSteinberg(
   }
 
   const indices = new Uint16Array(width * height);
+  const nearest = makeNearestColorMapper(palette);
 
   const addError = (x: number, y: number, er: number, eg: number, eb: number, weight: number) => {
     if (x < 0 || x >= width || y < 0 || y >= height) return;
@@ -87,7 +89,7 @@ export function ditherFloydSteinberg(
       const oldG = clamp255(bufG[i] ?? 0);
       const oldB = clamp255(bufB[i] ?? 0);
 
-      const idx = nearestColorIndex({ r: oldR, g: oldG, b: oldB }, palette);
+      const idx = nearest({ r: oldR, g: oldG, b: oldB });
       indices[i] = idx;
       const chosen = palette[idx];
       if (!chosen) continue;

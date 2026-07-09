@@ -44,6 +44,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Removed the committed SQLite dev database from version control.** It had been tracked before
   the `data/` gitignore rule landed; local databases are recreated on first run.
 
+### Performance
+
+- **Quantization is ~1.5–1.8× faster** with byte-identical output. `nearestColorIndex`
+  recomputed every palette entry's Lab value on every pixel; the new `makeNearestColorMapper`
+  precomputes the palette's Lab values once and reuses them across the whole grid. Wired into
+  the quantize and both dither hot loops. Measured on a 400×400 noisy gradient: no-dither
+  3.4 s → 1.9 s, Floyd–Steinberg 3.9 s → 2.5 s, with matching output checksums.
+
 ### Added
 
 - **Despeckle toggle**: one checkbox removes isolated single stitches (cells whose neighbors

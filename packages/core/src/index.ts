@@ -14,7 +14,7 @@ export { medianCutPalette } from './color/quantize.js';
 export { adaptivePalette } from './color/refine.js';
 export { consolidatePalette, WOOL_SHADE_DELTA_E } from './color/consolidate.js';
 export type { ConsolidatedPalette } from './color/consolidate.js';
-export { nearestColorIndex } from './color/nearest.js';
+export { nearestColorIndex, makeNearestColorMapper } from './color/nearest.js';
 
 export { pixelate } from './image/pixelate.js';
 export { pixelateDominant } from './image/dominantSample.js';

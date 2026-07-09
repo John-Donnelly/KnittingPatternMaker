@@ -1,7 +1,7 @@
 import type { Grid, QuantizeOptions, RGB } from '../types.js';
 import { adaptivePalette } from '../color/refine.js';
 import { consolidatePalette, WOOL_SHADE_DELTA_E } from '../color/consolidate.js';
-import { nearestColorIndex } from '../color/nearest.js';
+import { makeNearestColorMapper } from '../color/nearest.js';
 import { ditherBayer4, ditherFloydSteinberg } from './dither.js';
 
 /**
@@ -39,8 +39,9 @@ export function quantizeGrid(
   let palette: RGB[] = rawPalette;
   if (mergeDeltaE > 0 && rawPalette.length > 1) {
     const counts = new Array<number>(rawPalette.length).fill(0);
+    const nearestRaw = makeNearestColorMapper(rawPalette);
     for (const sample of samples) {
-      const idx = nearestColorIndex(sample, rawPalette);
+      const idx = nearestRaw(sample);
       counts[idx] = (counts[idx] ?? 0) + 1;
     }
     palette = consolidatePalette(rawPalette, counts, mergeDeltaE).palette;
@@ -48,14 +49,16 @@ export function quantizeGrid(
 
   let indices: Uint16Array;
   switch (options.dither) {
-    case 'none':
+    case 'none': {
       indices = new Uint16Array(width * height);
+      const nearest = makeNearestColorMapper(palette);
       for (let i = 0; i < samples.length; i++) {
         const s = samples[i];
         if (!s) continue;
-        indices[i] = nearestColorIndex(s, palette);
+        indices[i] = nearest(s);
       }
       break;
+    }
     case 'bayer4':
       indices = ditherBayer4(samples, width, height, palette);
       break;
