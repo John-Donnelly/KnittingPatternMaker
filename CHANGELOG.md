@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   drift apart.
 - **Removed the committed SQLite dev database from version control.** It had been tracked before
   the `data/` gitignore rule landed; local databases are recreated on first run.
+- **The Cloudflare Worker now sends the same Content-Security-Policy as the Node API**, so both
+  deployments constrain the SPA identically. Previously the Worker emitted only the default
+  secure headers with no CSP.
 
 ### Performance
 
@@ -61,6 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   process force-exits rather than hanging until the orchestrator's SIGKILL.
 - **Removed the unused `pino-pretty` production dependency** (nothing configured it as a logger
   transport), trimming the production install.
+- **CI now bundle-checks the Cloudflare Worker** (`wrangler deploy --dry-run`, no credentials
+  needed) in addition to typechecking it, so a bundling or config regression is caught before
+  deploy rather than at deploy time.
 
 ### Added
 

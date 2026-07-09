@@ -48,6 +48,16 @@ app.use(
   secureHeaders({
     // API responses are JSON/binary; the SPA's HTML is served by the assets pipeline.
     crossOriginResourcePolicy: 'same-origin',
+    // Mirror the Node API's helmet CSP so both deployments constrain the SPA identically:
+    // same-origin by default; inline element styles and blob:/data: preview images allowed.
+    contentSecurityPolicy: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+      connectSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+    },
   }),
 );
 

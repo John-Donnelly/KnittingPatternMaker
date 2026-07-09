@@ -21,4 +21,7 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
+      # Validate the Cloudflare Worker bundles (it packages apps/web/dist, so it runs after the
+      # main build). --dry-run needs no Cloudflare credentials.
+      - run: npm run build --workspace=apps/worker
       - run: npm test
