@@ -54,6 +54,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Accessibility & resilience pass:**
+  - A top-level **error boundary** catches render-time exceptions and shows a recoverable
+    "Something went wrong" panel with a reload button, instead of unmounting to a blank page.
+  - **Error messages now announce to screen readers** (`role="alert"`): upload/decode failures,
+    pattern-generation errors, export errors, and saved-pattern errors.
+  - A visible, on-brand **`:focus-visible` keyboard-focus ring**, and a **reduced-motion** media
+    rule that neutralizes transitions/animations for users who prefer less motion.
+  - **`<meta>` description, `theme-color`, and Open Graph / Twitter card tags** for search
+    results and social link previews (the preview image and canonical URL are added at deploy
+    time, once the production domain is known).
+
+### Added
+
 - **Despeckle toggle**: one checkbox removes isolated single stitches (cells whose neighbors
   all differ merge into the majority neighbor color — the standard manual chart cleanup,
   automated, simultaneous-pass deterministic). Applied client-side like the color edits, so

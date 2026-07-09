@@ -79,7 +79,11 @@ export function ExportBar({ spec, shareUrl, defaultTitle }: Props) {
           {copied === 'ok' ? 'Copied!' : 'Copy shareable link'}
         </button>
       </div>
-      {error && <p className="error">{error}</p>}
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

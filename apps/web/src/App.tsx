@@ -412,7 +412,11 @@ export function App() {
       <Header auth={auth} onSignOut={signOut} />
 
       <ImageUploader onImageSelected={onImageSelected} />
-      {uploadError && <p className="error">{uploadError}</p>}
+      {uploadError && (
+        <p className="error" role="alert">
+          {uploadError}
+        </p>
+      )}
 
       {imageUrl && sourceDims && (
         <div className="layout">
@@ -445,7 +449,11 @@ export function App() {
             <p className="hint" role="status" aria-live="polite">
               {loading ? (response ? 'Updating pattern…' : 'Making your pattern…') : ''}
             </p>
-            {error && <p className="error">{error}</p>}
+            {error && (
+              <p className="error" role="alert">
+                {error}
+              </p>
+            )}
             {response && view && (
               <div className={loading ? 'results-wrap results-wrap--stale' : 'results-wrap'}>
                 <label className="field field--checkbox panel" style={{ marginBottom: 0 }}>

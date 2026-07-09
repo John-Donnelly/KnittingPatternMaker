@@ -76,6 +76,9 @@ export function ImageUploader({ onImageSelected }: Props) {
     >
       <p className="uploader__title">Drop an image here, or click to choose a file</p>
       <p className="uploader__hint">Photo, drawing, or pixel art — JPG, PNG, or WebP.</p>
+      {/* Not role="alert": this <p> sits inside the role="button" dropzone, where a live region
+          would corrupt the button's accessible name and not announce reliably. It's a visible,
+          in-context validation hint; the API/decode error surfaces with role="alert" in App. */}
       {rejection && <p className="error uploader__error">{rejection}</p>}
       <div className="uploader__samples">
         <span className="uploader__samples-label">No image handy? Try a sample:</span>

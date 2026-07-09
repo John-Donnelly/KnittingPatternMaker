@@ -110,7 +110,11 @@ export function MyPatterns({
   return (
     <div className="panel">
       <h3>My patterns</h3>
-      {error && <p className="error">{error}</p>}
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
       {patterns && patterns.length === 0 && (
         <p className="hint">Nothing saved yet — generate a pattern and save it here.</p>
       )}

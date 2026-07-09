@@ -33,6 +33,14 @@ body {
   color: var(--ink);
 }
 
+/* A clearly visible, on-brand keyboard-focus ring. :focus-visible fires for keyboard/AT focus
+   but not mouse clicks, so pointer users don't see it. The outline follows each element's
+   border-radius, so pill buttons get a pill ring. */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .app {
   max-width: 1100px;
   margin: 0 auto;
@@ -719,4 +727,17 @@ button.uploader__sample:not(:disabled):hover {
   border-radius: 6px;
   background: none;
   cursor: pointer;
+}
+
+/* Honor a reduced-motion preference: neutralize transitions and animations (the button hover
+   lift, fades, and any future spinners) rather than removing them from the default experience. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
