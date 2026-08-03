@@ -4,6 +4,10 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 
+<p align="center">
+<img src="docs/media/kpm-pattern.png" alt="A generated colourwork chart shown beside its colour legend, which lists each colour's hex value, stitch count and estimated yardage, with the written row-by-row instructions below" width="900">
+</p>
+
 Turn any image (photo, drawing, or existing pixel art) into deterministic pixel art and a
 complete, printable knitting pattern — chart, written row-by-row instructions, color legend
 with yarn yardage estimate, and PDF/PNG export — sized to stitch counts you specify (optionally
@@ -14,6 +18,8 @@ technique, chart size, color count, sampling, and dithering for you — followin
 colorwork practice (2-colors-per-row Fair Isle, bobbin-count-aware intarsia; see
 [docs/KNITTING_NOTES.md](docs/KNITTING_NOTES.md), "Auto mode") — and tells you what it chose
 and why. Set any subset yourself and auto mode fills in only the rest.
+
+![Uploading an image: auto mode picks the technique, chart size and colour count, the chart renders, and unticking a colour in the legend merges it into its nearest neighbour — the chart, the stitch counts, the yardage estimate and the row-by-row instructions all re-derive immediately](docs/media/kpm-generate.gif)
 
 Three techniques are supported: **stranded (Fair Isle) colorwork**, **intarsia**, and
 **single-color knit/purl texture**. See [CHANGELOG.md](CHANGELOG.md) for what's landed so far,
