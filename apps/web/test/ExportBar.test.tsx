@@ -21,8 +21,8 @@ const SPEC: PatternSpecBody = {
 describe('ExportBar', () => {
   it('sends the pattern name with the export request', async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn(
-      async () => blobResponse(new Blob(['%PDF-'], { type: 'application/pdf' })),
+    const fetchMock = vi.fn(async () =>
+      blobResponse(new Blob(['%PDF-'], { type: 'application/pdf' })),
     );
     vi.stubGlobal('fetch', fetchMock);
     // downloadBlob uses URL.createObjectURL + anchor click; stub the URL part in jsdom.
