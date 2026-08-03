@@ -1,5 +1,9 @@
 # Knitting Pattern Maker
 
+[![CI](https://github.com/John-Donnelly/KnittingPatternMaker/actions/workflows/ci.yml/badge.svg)](https://github.com/John-Donnelly/KnittingPatternMaker/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+
 Turn any image (photo, drawing, or existing pixel art) into deterministic pixel art and a
 complete, printable knitting pattern — chart, written row-by-row instructions, color legend
 with yarn yardage estimate, and PDF/PNG export — sized to stitch counts you specify (optionally
