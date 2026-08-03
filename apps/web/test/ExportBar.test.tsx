@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ExportBar } from '../src/components/ExportBar.js';
 import type { PatternSpecBody } from '../src/api/types.js';
+import { blobResponse } from './blob-response.js';
 
 const SPEC: PatternSpecBody = {
   technique: 'stranded',
@@ -21,7 +22,7 @@ describe('ExportBar', () => {
   it('sends the pattern name with the export request', async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn(
-      async () => new Response(new Blob(['%PDF-'], { type: 'application/pdf' })),
+      async () => blobResponse(new Blob(['%PDF-'], { type: 'application/pdf' })),
     );
     vi.stubGlobal('fetch', fetchMock);
     // downloadBlob uses URL.createObjectURL + anchor click; stub the URL part in jsdom.

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '../src/App.js';
+import { blobResponse } from './blob-response.js';
 
 /** Full-flow check: generate a pattern (stubbed backend), toggle a color in the legend, and
  * the instructions + chart data must re-derive immediately (client-side, no new request). */
@@ -62,7 +63,7 @@ beforeEach(() => {
         return Response.json({ authEnabled: false, authRequired: false, authenticated: false });
       }
       if (url.startsWith('/samples/')) {
-        return new Response(new Blob(['x'], { type: 'image/png' }));
+        return blobResponse(new Blob(['x'], { type: 'image/png' }));
       }
       if (url === '/api/pattern') {
         return Response.json(PATTERN_RESPONSE);

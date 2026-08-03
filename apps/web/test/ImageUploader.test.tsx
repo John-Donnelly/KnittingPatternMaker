@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ImageUploader } from '../src/components/ImageUploader.js';
+import { blobResponse } from './blob-response.js';
 
 describe('ImageUploader', () => {
   it('shows a visible rejection message for non-image files', () => {
@@ -21,7 +22,7 @@ describe('ImageUploader', () => {
     const onImageSelected = vi.fn();
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => new Response(new Blob(['png-bytes'], { type: 'image/png' }))),
+      vi.fn(async () => blobResponse(new Blob(['png-bytes'], { type: 'image/png' }))),
     );
     render(<ImageUploader onImageSelected={onImageSelected} />);
 
