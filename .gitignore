@@ -12,8 +12,6 @@ Thumbs.db
 npm-debug.log*
 .vite/
 .turbo/
-.claude/scheduled_tasks.lock
-.claude/worktrees/
 data/
 
 # wrangler local state (contains machine-specific data - never commit)
