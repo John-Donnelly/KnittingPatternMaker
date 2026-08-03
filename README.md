@@ -4,6 +4,8 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 
+**Status:** working, not yet released · **Licence:** MIT
+
 <p align="center">
 <img src="docs/media/kpm-pattern.png" alt="A generated colourwork chart shown beside its colour legend, which lists each colour's hex value, stitch count and estimated yardage, with the written row-by-row instructions below" width="900">
 </p>
