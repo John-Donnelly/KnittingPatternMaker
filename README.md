@@ -1,7 +1,7 @@
 # Knitting Pattern Maker
 
 [![CI](https://github.com/John-Donnelly/KnittingPatternMaker/actions/workflows/ci.yml/badge.svg)](https://github.com/John-Donnelly/KnittingPatternMaker/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![License metadata: MIT vs UNLICENSED](https://img.shields.io/badge/license-MIT%20vs%20UNLICENSED-orange.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 
 <p align="center">
@@ -38,7 +38,7 @@ docs            architecture and knitting-domain notes
 
 ## Requirements
 
-- Node.js >= 20 (see `.nvmrc`)
+- Node.js >= 22 (see `.nvmrc`; the root `package.json` declares `>=22.0.0`)
 - npm >= 10 (npm workspaces)
 
 ## Getting started
@@ -125,8 +125,17 @@ PUBLIC_URL=https://your-host.example
 SESSION_SECRET=<at least 32 characters>
 HOST=0.0.0.0
 PORT=4000
+# For a local Node process, keep the database under the repository:
 DATA_DIR=./data
 ```
+
+The data directory differs by execution path. `DATA_DIR=./data` is a local
+Node-process path relative to the repository. For Docker, set
+`DATA_DIR=/data`: the tracked image creates `/data`, gives it to the `node` user
+and declares it as a volume, so it is the image-prepared writable location.
+Because `docker-compose.yml` passes `.env` into the container, leaving the
+copied example's `./data` value in place overrides that image default and points
+at `/app/data` instead.
 
 Optional OIDC configuration:
 
@@ -141,10 +150,23 @@ AUTH_REQUIRED=true
 Other current Node settings include `LOG_LEVEL`, `RATE_LIMIT_MAX` and
 `STATIC_ROOT`.
 
+There is an important current parser trap: do not copy an active
+`AUTH_REQUIRED=false` into `.env` when auth should be disabled. The config uses
+`z.coerce.boolean()`, so the non-empty string `"false"` is coerced to `true`.
+The no-code workaround is to omit or comment out `AUTH_REQUIRED`, which leaves
+the schema default at false. If `AUTH_REQUIRED=true` is set, provide all three
+OIDC values — `OIDC_ISSUER`, `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` — or
+production configuration is rejected.
+
 `SESSION_SECRET` is mandatory in production. `PUBLIC_URL` must also be changed
 from the localhost default in production; the config loader fails fast if these
 requirements are not met. `AUTH_REQUIRED=true` is rejected unless the complete
 OIDC issuer/client-id/client-secret set is configured.
+
+The current tracked `Dockerfile` still uses Node 20 for both its build and
+runtime stages, despite the Node >=22 requirement above. Until that source
+mismatch is reconciled, `docker compose up --build` is not a source-backed,
+validated production recipe for the current project.
 
 After creating and reviewing `.env`, build/start through Docker:
 
@@ -180,10 +202,11 @@ and security surface; do not infer that it exists from the current `plan` fields
 
 ## Licence and privacy
 
-This repository is licensed under the **MIT License**, matching the checked-in
-[LICENSE](LICENSE) file (Copyright © 2026 John Donnelly). The earlier README
-sentence describing the repository as proprietary contradicted the actual
-licence and was removed.
+Licensing metadata is currently inconsistent: the tracked [LICENSE](LICENSE)
+file contains the **MIT License** (Copyright © 2026 John Donnelly), while the
+root `package.json` declares `"license": "UNLICENSED"`. Resolve this repository
+metadata conflict before relying on the badge or treating the project as
+published under MIT.
 
 [PRIVACY.md](PRIVACY.md) describes the service-data model. Uploaded images are
 intended to be processed for pattern generation rather than retained as account
