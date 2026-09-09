@@ -4,40 +4,36 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 
-**Status:** working, not yet released · **Licence:** MIT
-
 <p align="center">
 <img src="docs/media/kpm-pattern.png" alt="A generated colourwork chart shown beside its colour legend, which lists each colour's hex value, stitch count and estimated yardage, with the written row-by-row instructions below" width="900">
 </p>
 
-Turn any image (photo, drawing, or existing pixel art) into deterministic pixel art and a
-complete, printable knitting pattern — chart, written row-by-row instructions, color legend
-with yarn yardage estimate, and PDF/PNG export — sized to stitch counts you specify (optionally
-gauge-aware, so the chart isn't visually stretched relative to what you'll actually knit).
+Turn an image into deterministic pixel art and a knitting pattern containing a
+chart, row-by-row instructions, colour legend, yardage estimate and PDF/PNG
+exports. The core algorithms are shared between browser/server deployment paths
+so pattern-generation behaviour is not maintained as two separate
+implementations.
 
-**Every setting is optional.** By default, **auto mode** analyzes the image and picks the
-technique, chart size, color count, sampling, and dithering for you — following standard
-colorwork practice (2-colors-per-row Fair Isle, bobbin-count-aware intarsia; see
-[docs/KNITTING_NOTES.md](docs/KNITTING_NOTES.md), "Auto mode") — and tells you what it chose
-and why. Set any subset yourself and auto mode fills in only the rest.
+**Every pattern setting is optional.** Auto mode analyses the image and chooses
+technique, chart size, colour count, sampling and dithering when those values are
+not supplied. Manual controls can override any subset.
 
 ![Uploading an image: auto mode picks the technique, chart size and colour count, the chart renders, and unticking a colour in the legend merges it into its nearest neighbour — the chart, the stitch counts, the yardage estimate and the row-by-row instructions all re-derive immediately](docs/media/kpm-generate.gif)
 
-Three techniques are supported: **stranded (Fair Isle) colorwork**, **intarsia**, and
-**single-color knit/purl texture**. See [CHANGELOG.md](CHANGELOG.md) for what's landed so far,
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how it's built and why, and
-[docs/KNITTING_NOTES.md](docs/KNITTING_NOTES.md) for the exact knitting conventions/assumptions
-the pattern generators encode (chart reading direction, floats, bobbins, WS/RS stitch inversion,
-gauge math, yardage estimate caveats).
+Current core pattern modes include stranded colourwork, intarsia and single-
+colour knit/purl texture. See [docs/KNITTING_NOTES.md](docs/KNITTING_NOTES.md)
+for the knitting conventions and assumptions encoded by the generators, and
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for request/data-flow details and
+known limits.
 
 ## Monorepo layout
 
-```
-packages/core   deterministic image-quantization and pattern-generation algorithms (no I/O);
-                shared by both the frontend and the backend so they can never disagree
-apps/api        Fastify backend: image decoding, pattern assembly, PDF/PNG export
-apps/web        React + Vite frontend: upload, configure, live preview, export, share links
-docs/           architecture and domain-convention notes
+```text
+packages/core   deterministic image/pattern algorithms and shared types
+apps/api        Fastify/Node API, auth, SQLite saved patterns and PDF/PNG export
+apps/web        React + Vite browser UI
+apps/worker     Cloudflare Worker/Hono deployment with D1 and Worker export paths
+docs            architecture and knitting-domain notes
 ```
 
 ## Requirements
@@ -49,105 +45,148 @@ docs/           architecture and domain-convention notes
 
 ```bash
 npm install
-npm run build          # builds packages/core, then apps/api, then apps/web
-npm test                # runs all workspace test suites
-npm run dev:api          # starts the backend on http://localhost:4000
-npm run dev:web          # starts the frontend on http://localhost:5173 (proxies /api to the backend)
+npm run build
+npm test
+npm run dev:api
+npm run dev:web
 ```
 
-Open the frontend URL and drop in an image — **Auto (recommended)** picks every setting from
-the image and explains each choice; "Customize these settings" switches to manual controls
-pre-filled with auto's picks. The preview updates automatically as you adjust. Working from a photo or JPEG of an existing chart? Switch
-**Sampling** to _Dominant color_ to pull crisp flat colors out instead of muddy averaged ones
-(see [docs/KNITTING_NOTES.md](docs/KNITTING_NOTES.md)). Download a PDF/PNG or copy a shareable
-link once you're happy with it. A shared link is fully self-contained: opening one renders the
-exact same pattern without needing the original image or a live backend.
+The default local API is `http://localhost:4000`; the Vite frontend normally
+runs at `http://localhost:5173` and proxies `/api` during development.
 
-## Scripts (root)
+Open the frontend and drop in an image. Auto mode chooses unset options and the
+preview re-runs as controls change. Dominant-colour sampling is useful for
+existing flat/pixel-art charts where averaged colours would be undesirable.
 
-| Script              | Purpose                                  |
-| ------------------- | ---------------------------------------- |
-| `npm run build`     | Build all workspaces in dependency order |
-| `npm test`          | Run all workspace test suites            |
-| `npm run lint`      | ESLint across the whole repo             |
-| `npm run format`    | Prettier write                           |
-| `npm run typecheck` | TypeScript project-wide type checking    |
-| `npm run dev:api`   | Backend dev server (tsx watch)           |
-| `npm run dev:web`   | Frontend dev server (Vite)               |
+A share link encodes the pattern specification needed to reconstruct the pattern
+rather than requiring the original uploaded image. Review the size/validation
+limits in the architecture document before treating arbitrary links as an
+unbounded persistence mechanism.
+
+## Root scripts
+
+| Script | Purpose |
+|---|---|
+| `npm run build` | Build workspaces in dependency order |
+| `npm test` | Run workspace test suites |
+| `npm run lint` | ESLint across the repository |
+| `npm run format` | Prettier write |
+| `npm run typecheck` | TypeScript type checking |
+| `npm run dev:api` | Fastify development server |
+| `npm run dev:web` | Vite development server |
 
 ## API
 
-| Endpoint               | Body                                                                                                                   | Returns                                                                                                  |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `POST /api/pattern`    | multipart: `image` file + optional `options` JSON (every field optional — unset fields are auto-chosen from the image) | the full computed pattern (grid, instructions, yardage, share link, `resolvedOptions` + `autoDecisions`) |
-| `POST /api/export/pdf` | JSON: `{ technique, gauge?, grid }`                                                                                    | `application/pdf`                                                                                        |
-| `POST /api/export/png` | JSON: `{ technique, gauge?, grid }`                                                                                    | `image/png` (chart only)                                                                                 |
+The Node API currently exposes the pattern/export routes plus auth/saved-pattern
+routes implemented under `apps/api/src/routes/`.
 
-Auth routes (active when SSO is configured): `GET /api/auth/login` (redirects to the identity
-provider), `GET /api/auth/callback`, `POST /api/auth/logout`, `GET /api/auth/me`.
+Core generation/export entry points include:
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full request/response shapes and the
-pipeline each endpoint runs.
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/pattern` | multipart image + optional pattern options; returns computed pattern/auto decisions |
+| `POST /api/export/pdf` | export a supplied pattern/grid as PDF |
+| `POST /api/export/png` | export the chart as PNG |
+
+When OIDC is configured, the auth surface includes login, callback, logout and
+current-user routes. Saved-pattern routes are session-gated and store each
+pattern's self-contained share specification rather than the original uploaded
+image.
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full shapes and pipeline
+behaviour.
 
 ## Deployment
 
-Two supported targets, same API contract and byte-identical pattern output:
+There are two maintained deployment implementations:
 
-- **Cloudflare (recommended for production)** — a single Worker serves the API (Hono), the
-  built SPA (static assets), and D1 storage; images decode via WASM codecs. See
-  [apps/worker/README.md](apps/worker/README.md) for setup, deploy, cost model, and WAF
-  rate-limit suggestions.
-- **Docker / any Node host** — the Fastify API serves the built frontend (landing page at
-  `/`, the maker at `/app`) alongside `/api`. Security headers (helmet + CSP), per-IP rate
-  limiting, upload size limits, and redacted logging are on by default.
+- **Cloudflare Worker** — Hono Worker serving API + built SPA with D1 persistence
+  and Worker-native image/export support. Follow
+  [apps/worker/README.md](apps/worker/README.md) and
+  `apps/worker/wrangler.jsonc` for the current configuration/deploy contract.
+- **Node/Docker** — Fastify API plus built frontend, SQLite persistence and the
+  Node PDF/PNG export path.
+
+### Node/Docker configuration
+
+The tracked `.env.example` is the canonical starting point for the Node/Docker
+configuration consumed by `apps/api/src/config.ts`. Copy it to `.env`, then set
+production-appropriate values rather than committing secrets:
 
 ```bash
-cp .env.example .env      # fill in SESSION_SECRET (and OIDC_* for sign-in)
-docker compose up --build # serves everything on http://localhost:4000
+cp .env.example .env
 ```
 
-Configuration is environment-driven and validated at startup — see [.env.example](.env.example)
-for every variable. Highlights:
+Key values include:
 
-- `SESSION_SECRET` — required in production (>= 32 chars); signs the session cookies.
-- `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` — enable **single sign-on** with any
-  standard OIDC provider (Google, Microsoft Entra, Okta, Auth0, Keycloak, ...). Register
-  `${PUBLIC_URL}/api/auth/callback` as the redirect URI with your provider. Sessions are
-  stateless signed cookies (authorization-code + PKCE flow; no token ever reaches the browser).
-- `AUTH_REQUIRED=true` — gate pattern generation/export behind sign-in. With it unset (or SSO
-  unconfigured), the app runs fully anonymously — including local development, which needs no
-  auth setup at all.
-- `PUBLIC_URL` — the deployed origin; drives CORS and the default OIDC redirect URI.
+```text
+NODE_ENV=production
+PUBLIC_URL=https://your-host.example
+SESSION_SECRET=<at least 32 characters>
+HOST=0.0.0.0
+PORT=4000
+DATA_DIR=./data
+```
 
-Run behind TLS (a reverse proxy or your platform's ingress) — session cookies are marked
-`Secure` in production.
+Optional OIDC configuration:
 
-### Accounts & saved patterns
+```text
+OIDC_ISSUER=https://issuer.example
+OIDC_CLIENT_ID=...
+OIDC_CLIENT_SECRET=...
+# OIDC_REDIRECT_URI defaults to ${PUBLIC_URL}/api/auth/callback
+AUTH_REQUIRED=true
+```
 
-Signing in (SSO) gives each user a pattern library: **Save pattern** stores the pattern's
-self-contained share-spec token server-side (SQLite at `DATA_DIR`, `apps/api/src/db.ts`), and
-**My patterns** lists/opens/deletes them. `POST/GET/DELETE /api/patterns[...]` — all
-session-gated, per-user isolated, capped at 200 patterns per account.
+Other current Node settings include `LOG_LEVEL`, `RATE_LIMIT_MAX` and
+`STATIC_ROOT`.
 
-### Stripe integration points
+`SESSION_SECRET` is mandatory in production. `PUBLIC_URL` must also be changed
+from the localhost default in production; the config loader fails fast if these
+requirements are not met. `AUTH_REQUIRED=true` is rejected unless the complete
+OIDC issuer/client-id/client-secret set is configured.
 
-Payments are deliberately **not** wired yet, but the seams are in place so an integration
-only touches three spots:
+After creating and reviewing `.env`, build/start through Docker:
 
-1. **Accounts**: the `users` table already carries `plan` (default `'free'`) and
-   `stripe_customer_id`; `GET /api/auth/me` returns `plan` to the frontend.
-2. **Checkout**: add a session-gated `POST /api/billing/checkout` that creates a Stripe
-   Checkout Session (`STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` are already stubbed in
-   `.env.example`) and stores `stripe_customer_id` on the user row.
-3. **Webhook**: add `POST /api/billing/webhook` (verify with `STRIPE_WEBHOOK_SECRET`) that
-   flips `users.plan` on `checkout.session.completed` / subscription events. Gate premium
-   features by reading `plan` where `requireAuth` already runs.
+```bash
+docker compose up --build
+```
 
-## License & privacy
+Use TLS in front of production deployments. The current Node server applies
+secure headers, rate limiting and upload/input limits; Cloudflare deployments
+have their own Worker/WAF controls documented in the Worker README.
 
-Proprietary — © 2026 JAD Apps, all rights reserved. See [LICENSE](LICENSE).
+### Accounts and saved patterns
 
-[PRIVACY.md](PRIVACY.md) describes how the Service handles data: uploaded images are processed in
-memory and never stored, there is no analytics or third-party tracking, and accounts/saved
-patterns exist only when SSO sign-in is enabled. A few operational placeholders (contact email,
-hosting region, jurisdiction) must be filled in before publishing it.
+With OIDC enabled, signed-in users can save/list/open/delete patterns. The Node
+path uses SQLite under `DATA_DIR`; the Worker path uses its D1 binding. Pattern
+records persist the share specification, not the source upload.
+
+Review [PRIVACY.md](PRIVACY.md) before a public deployment because operational
+placeholders such as contact/region/jurisdiction still require deployment-specific
+values.
+
+### Payments status
+
+Stripe/payment processing is **not implemented in the current tracked source**.
+The account data model contains plan/customer seams that can support a future
+billing integration, but the repository currently has no billing checkout or
+webhook route and the tracked environment/config surface does not define a
+working Stripe integration.
+
+If billing is added later, treat checkout, webhook verification, entitlement
+updates, secrets and refund/subscription behaviour as a separate implementation
+and security surface; do not infer that it exists from the current `plan` fields.
+
+## Licence and privacy
+
+This repository is licensed under the **MIT License**, matching the checked-in
+[LICENSE](LICENSE) file (Copyright © 2026 John Donnelly). The earlier README
+sentence describing the repository as proprietary contradicted the actual
+licence and was removed.
+
+[PRIVACY.md](PRIVACY.md) describes the service-data model. Uploaded images are
+intended to be processed for pattern generation rather than retained as account
+assets; saved patterns/account information exist only on the configured
+server-side account path. Verify the privacy document and deployment-specific
+third parties/region/contact details before publishing a hosted service.
