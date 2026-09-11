@@ -25,7 +25,7 @@
     "knitting-pattern-core": "^0.1.0",
     "pdf-lib": "^1.17.1",
     "pngjs": "^7.0.0",
-    "sharp": "^0.35.3",
+    "sharp": "^0.35.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {
