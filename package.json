@@ -34,6 +34,6 @@
     "typescript-eslint": "^8.62.1"
   },
   "dependencies": {
-    "hono": "^4.12.34"
+    "hono": "^4.13.13"
   }
 }
