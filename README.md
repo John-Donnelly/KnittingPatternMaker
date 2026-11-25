@@ -65,15 +65,15 @@ unbounded persistence mechanism.
 
 ## Root scripts
 
-| Script | Purpose |
-|---|---|
-| `npm run build` | Build workspaces in dependency order |
-| `npm test` | Run workspace test suites |
-| `npm run lint` | ESLint across the repository |
-| `npm run format` | Prettier write |
-| `npm run typecheck` | TypeScript type checking |
-| `npm run dev:api` | Fastify development server |
-| `npm run dev:web` | Vite development server |
+| Script              | Purpose                              |
+| ------------------- | ------------------------------------ |
+| `npm run build`     | Build workspaces in dependency order |
+| `npm test`          | Run workspace test suites            |
+| `npm run lint`      | ESLint across the repository         |
+| `npm run format`    | Prettier write                       |
+| `npm run typecheck` | TypeScript type checking             |
+| `npm run dev:api`   | Fastify development server           |
+| `npm run dev:web`   | Vite development server              |
 
 ## API
 
@@ -82,11 +82,11 @@ routes implemented under `apps/api/src/routes/`.
 
 Core generation/export entry points include:
 
-| Endpoint | Purpose |
-|---|---|
-| `POST /api/pattern` | multipart image + optional pattern options; returns computed pattern/auto decisions |
-| `POST /api/export/pdf` | export a supplied pattern/grid as PDF |
-| `POST /api/export/png` | export the chart as PNG |
+| Endpoint               | Purpose                                                                             |
+| ---------------------- | ----------------------------------------------------------------------------------- |
+| `POST /api/pattern`    | multipart image + optional pattern options; returns computed pattern/auto decisions |
+| `POST /api/export/pdf` | export a supplied pattern/grid as PDF                                               |
+| `POST /api/export/png` | export the chart as PNG                                                             |
 
 When OIDC is configured, the auth surface includes login, callback, logout and
 current-user routes. Saved-pattern routes are session-gated and store each
